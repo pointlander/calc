@@ -21,7 +21,7 @@ e4 <- minus value
     / value
 value <- number
        / sub
-number <- < [0-9]+ > sp
+number <- < [-]? [0-9]+ ([.] [0-9]*)? > sp
 sub <- open e1 close
 add <- '+' sp
 minus <- '-' sp

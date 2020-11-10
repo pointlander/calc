@@ -6,13 +6,14 @@ package main
 
 import (
 	"math/big"
+	"strings"
 )
 
-func (c *Calculator) Eval() *big.Int {
+func (c *Calculator) Eval() *big.Float {
 	return c.Rulee(c.AST())
 }
 
-func (c *Calculator) Rulee(node *node32) *big.Int {
+func (c *Calculator) Rulee(node *node32) *big.Float {
 	node = node.up
 	for node != nil {
 		switch node.pegRule {
@@ -24,9 +25,9 @@ func (c *Calculator) Rulee(node *node32) *big.Int {
 	return nil
 }
 
-func (c *Calculator) Rulee1(node *node32) *big.Int {
+func (c *Calculator) Rulee1(node *node32) *big.Float {
 	node = node.up
-	var a *big.Int
+	var a *big.Float
 	for node != nil {
 		switch node.pegRule {
 		case rulee2:
@@ -45,9 +46,9 @@ func (c *Calculator) Rulee1(node *node32) *big.Int {
 	return a
 }
 
-func (c *Calculator) Rulee2(node *node32) *big.Int {
+func (c *Calculator) Rulee2(node *node32) *big.Float {
 	node = node.up
-	var a *big.Int
+	var a *big.Float
 	for node != nil {
 		switch node.pegRule {
 		case rulee3:
@@ -59,20 +60,21 @@ func (c *Calculator) Rulee2(node *node32) *big.Int {
 		case ruledivide:
 			node = node.next
 			b := c.Rulee3(node)
-			a.Div(a, b)
+			a.Quo(a, b)
 		case rulemodulus:
 			node = node.next
 			b := c.Rulee3(node)
-			a.Mod(a, b)
+			_ = b
+			//a.Mod(a, b)
 		}
 		node = node.next
 	}
 	return a
 }
 
-func (c *Calculator) Rulee3(node *node32) *big.Int {
+func (c *Calculator) Rulee3(node *node32) *big.Float {
 	node = node.up
-	var a *big.Int
+	var a *big.Float
 	for node != nil {
 		switch node.pegRule {
 		case rulee4:
@@ -80,14 +82,15 @@ func (c *Calculator) Rulee3(node *node32) *big.Int {
 		case ruleexponentiation:
 			node = node.next
 			b := c.Rulee4(node)
-			a.Exp(a, b, nil)
+			_ = b
+			//a.Exp(a, b, nil)
 		}
 		node = node.next
 	}
 	return a
 }
 
-func (c *Calculator) Rulee4(node *node32) *big.Int {
+func (c *Calculator) Rulee4(node *node32) *big.Float {
 	node = node.up
 	minus := false
 	for node != nil {
@@ -106,13 +109,15 @@ func (c *Calculator) Rulee4(node *node32) *big.Int {
 	return nil
 }
 
-func (c *Calculator) Rulevalue(node *node32) *big.Int {
+func (c *Calculator) Rulevalue(node *node32) *big.Float {
 	node = node.up
 	for node != nil {
 		switch node.pegRule {
 		case rulenumber:
-			a := big.NewInt(0)
-			a.SetString(string(c.buffer[node.begin:node.end]), 10)
+			a, _, err := big.ParseFloat(strings.TrimSpace(string(c.buffer[node.begin:node.end])), 10, 128, big.ToNearestEven)
+			if err != nil {
+				panic(err)
+			}
 			return a
 		case rulesub:
 			return c.Rulesub(node)
@@ -122,7 +127,7 @@ func (c *Calculator) Rulevalue(node *node32) *big.Int {
 	return nil
 }
 
-func (c *Calculator) Rulesub(node *node32) *big.Int {
+func (c *Calculator) Rulesub(node *node32) *big.Float {
 	node = node.up
 	for node != nil {
 		switch node.pegRule {
