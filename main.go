@@ -29,6 +29,8 @@ func main() {
 			fmt.Println(err)
 			continue
 		}
-		fmt.Println(value + " = " + calc.Eval().String())
+		result := calc.Eval()
+		decimal, _ := result.Float64()
+		fmt.Printf("%s = %f\n", result.String(), decimal)
 	}
 }

@@ -5,15 +5,16 @@
 package main
 
 import (
+	"math"
 	"math/big"
 	"strings"
 )
 
-func (c *Calculator) Eval() *big.Float {
+func (c *Calculator) Eval() *big.Rat {
 	return c.Rulee(c.AST())
 }
 
-func (c *Calculator) Rulee(node *node32) *big.Float {
+func (c *Calculator) Rulee(node *node32) *big.Rat {
 	node = node.up
 	for node != nil {
 		switch node.pegRule {
@@ -25,9 +26,9 @@ func (c *Calculator) Rulee(node *node32) *big.Float {
 	return nil
 }
 
-func (c *Calculator) Rulee1(node *node32) *big.Float {
+func (c *Calculator) Rulee1(node *node32) *big.Rat {
 	node = node.up
-	var a *big.Float
+	var a *big.Rat
 	for node != nil {
 		switch node.pegRule {
 		case rulee2:
@@ -46,9 +47,9 @@ func (c *Calculator) Rulee1(node *node32) *big.Float {
 	return a
 }
 
-func (c *Calculator) Rulee2(node *node32) *big.Float {
+func (c *Calculator) Rulee2(node *node32) *big.Rat {
 	node = node.up
-	var a *big.Float
+	var a *big.Rat
 	for node != nil {
 		switch node.pegRule {
 		case rulee3:
@@ -64,17 +65,18 @@ func (c *Calculator) Rulee2(node *node32) *big.Float {
 		case rulemodulus:
 			node = node.next
 			b := c.Rulee3(node)
-			_ = b
-			//a.Mod(a, b)
+			if a.Denom().Cmp(big.NewInt(1)) == 0 && b.Denom().Cmp(big.NewInt(1)) == 0 {
+				a.Num().Mod(a.Num(), b.Num())
+			}
 		}
 		node = node.next
 	}
 	return a
 }
 
-func (c *Calculator) Rulee3(node *node32) *big.Float {
+func (c *Calculator) Rulee3(node *node32) *big.Rat {
 	node = node.up
-	var a *big.Float
+	var a *big.Rat
 	for node != nil {
 		switch node.pegRule {
 		case rulee4:
@@ -82,15 +84,17 @@ func (c *Calculator) Rulee3(node *node32) *big.Float {
 		case ruleexponentiation:
 			node = node.next
 			b := c.Rulee4(node)
-			_ = b
-			//a.Exp(a, b, nil)
+			x, _ := a.Float64()
+			y, _ := b.Float64()
+			pow := math.Pow(x, y)
+			a.SetFloat64(pow)
 		}
 		node = node.next
 	}
 	return a
 }
 
-func (c *Calculator) Rulee4(node *node32) *big.Float {
+func (c *Calculator) Rulee4(node *node32) *big.Rat {
 	node = node.up
 	minus := false
 	for node != nil {
@@ -109,15 +113,13 @@ func (c *Calculator) Rulee4(node *node32) *big.Float {
 	return nil
 }
 
-func (c *Calculator) Rulevalue(node *node32) *big.Float {
+func (c *Calculator) Rulevalue(node *node32) *big.Rat {
 	node = node.up
 	for node != nil {
 		switch node.pegRule {
 		case rulenumber:
-			a, _, err := big.ParseFloat(strings.TrimSpace(string(c.buffer[node.begin:node.end])), 10, 128, big.ToNearestEven)
-			if err != nil {
-				panic(err)
-			}
+			a := big.NewRat(1, 1)
+			a.SetString(strings.TrimSpace(string(c.buffer[node.begin:node.end])))
 			return a
 		case rulesub:
 			return c.Rulesub(node)
@@ -127,7 +129,7 @@ func (c *Calculator) Rulevalue(node *node32) *big.Float {
 	return nil
 }
 
-func (c *Calculator) Rulesub(node *node32) *big.Float {
+func (c *Calculator) Rulesub(node *node32) *big.Rat {
 	node = node.up
 	for node != nil {
 		switch node.pegRule {
