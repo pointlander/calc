@@ -5,9 +5,10 @@
 package main
 
 import (
-	"math"
 	"math/big"
 	"strings"
+
+	"github.com/ALTree/bigfloat"
 )
 
 func (c *Calculator) Eval() *big.Rat {
@@ -84,10 +85,10 @@ func (c *Calculator) Rulee3(node *node32) *big.Rat {
 		case ruleexponentiation:
 			node = node.next
 			b := c.Rulee4(node)
-			x, _ := a.Float64()
-			y, _ := b.Float64()
-			pow := math.Pow(x, y)
-			a.SetFloat64(pow)
+			x, _, _ := big.ParseFloat(a.FloatString(1024), 10, 1024, big.ToNearestEven)
+			y, _, _ := big.ParseFloat(b.FloatString(1024), 10, 1024, big.ToNearestEven)
+			pow := bigfloat.Pow(x, y)
+			a.SetString(pow.String())
 		}
 		node = node.next
 	}
