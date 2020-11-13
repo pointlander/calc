@@ -20,8 +20,15 @@ e3 <- e4 ( exponentiation e4
 e4 <- minus value
     / value
 value <- number
+       / exp
+       / log
+       / sqrt
        / sub
 number <- < [-]? [0-9]+ ([.] [0-9]*)? > sp
+exp <- 'exp' open value close
+     / 'e^' value
+log <- 'log' open value close
+sqrt <- 'sqrt' open value close
 sub <- open e1 close
 add <- '+' sp
 minus <- '-' sp

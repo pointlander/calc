@@ -122,6 +122,42 @@ func (c *Calculator) Rulevalue(node *node32) *big.Rat {
 			a := big.NewRat(1, 1)
 			a.SetString(strings.TrimSpace(string(c.buffer[node.begin:node.end])))
 			return a
+		case ruleexp:
+			node := node.up
+			for node != nil {
+				if node.pegRule == rulevalue {
+					a := c.Rulevalue(node)
+					x, _, _ := big.ParseFloat(a.FloatString(1024), 10, 1024, big.ToNearestEven)
+					exp := bigfloat.Exp(x)
+					a.SetString(exp.String())
+					return a
+				}
+				node = node.next
+			}
+		case rulelog:
+			node := node.up
+			for node != nil {
+				if node.pegRule == rulevalue {
+					a := c.Rulevalue(node)
+					x, _, _ := big.ParseFloat(a.FloatString(1024), 10, 1024, big.ToNearestEven)
+					log := bigfloat.Log(x)
+					a.SetString(log.String())
+					return a
+				}
+				node = node.next
+			}
+		case rulesqrt:
+			node := node.up
+			for node != nil {
+				if node.pegRule == rulevalue {
+					a := c.Rulevalue(node)
+					x, _, _ := big.ParseFloat(a.FloatString(1024), 10, 1024, big.ToNearestEven)
+					sqrt := bigfloat.Sqrt(x)
+					a.SetString(sqrt.String())
+					return a
+				}
+				node = node.next
+			}
 		case rulesub:
 			return c.Rulesub(node)
 		}
