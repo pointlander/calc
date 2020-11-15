@@ -5,7 +5,6 @@
 package main
 
 import (
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -143,7 +142,6 @@ func (c *Calculator) Rulevalue(node *node32) *big.Rat {
 				diff.Sub(a, b)
 				diffn := big.NewFloat(0).SetPrec(1024)
 				diffn.Sub(an, bn)
-				fmt.Println(diff.String())
 				if diff.Cmp(diffn) == 0 {
 					break
 				}
