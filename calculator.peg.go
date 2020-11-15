@@ -8,6 +8,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 const endSymbol rune = 1114112
@@ -24,8 +25,9 @@ const (
 	rulee4
 	rulevalue
 	rulenumber
-	rulepi
 	ruleexp
+	rulepi
+	ruleprec
 	rulelog
 	rulesqrt
 	rulesub
@@ -50,8 +52,9 @@ var rul3s = [...]string{
 	"e4",
 	"value",
 	"number",
-	"pi",
 	"exp",
+	"pi",
+	"prec",
 	"log",
 	"sqrt",
 	"sub",
@@ -93,7 +96,7 @@ func (node *node32) print(w io.Writer, pretty bool, buffer string) {
 			if !pretty {
 				fmt.Fprintf(w, "%v %v\n", rule, quote)
 			} else {
-				fmt.Fprintf(w, "\x1B[34m%v\x1B[m %v\n", rule, quote)
+				fmt.Fprintf(w, "\x1B[36m%v\x1B[m %v\n", rule, quote)
 			}
 			if node.up != nil {
 				print(node.up, depth+1)
@@ -179,7 +182,7 @@ func (t *tokens32) Tokens() []token32 {
 type Calculator struct {
 	Buffer string
 	buffer []rune
-	rules  [23]func() bool
+	rules  [24]func() bool
 	parse  func(rule ...int) error
 	reset  func()
 	Pretty bool
@@ -264,6 +267,12 @@ func (p *Calculator) PrintSyntaxTree() {
 
 func (p *Calculator) WriteSyntaxTree(w io.Writer) {
 	p.tokens32.WriteSyntaxTree(w, p.Buffer)
+}
+
+func (p *Calculator) SprintSyntaxTree() string {
+	var bldr strings.Builder
+	p.WriteSyntaxTree(&bldr)
+	return bldr.String()
 }
 
 func Pretty(pretty bool) func(*Calculator) error {
@@ -527,7 +536,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position20, tokenIndex20
 			return false
 		},
-		/* 5 value <- <(number / pi / exp / log / sqrt / sub)> */
+		/* 5 value <- <(number / exp / pi / prec / log / sqrt / sub)> */
 		func() bool {
 			position24, tokenIndex24 := position, tokenIndex
 			{
@@ -540,29 +549,35 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 					goto l26
 				l27:
 					position, tokenIndex = position26, tokenIndex26
-					if !_rules[rulepi]() {
+					if !_rules[ruleexp]() {
 						goto l28
 					}
 					goto l26
 				l28:
 					position, tokenIndex = position26, tokenIndex26
-					if !_rules[ruleexp]() {
+					if !_rules[rulepi]() {
 						goto l29
 					}
 					goto l26
 				l29:
 					position, tokenIndex = position26, tokenIndex26
-					if !_rules[rulelog]() {
+					if !_rules[ruleprec]() {
 						goto l30
 					}
 					goto l26
 				l30:
 					position, tokenIndex = position26, tokenIndex26
-					if !_rules[rulesqrt]() {
+					if !_rules[rulelog]() {
 						goto l31
 					}
 					goto l26
 				l31:
+					position, tokenIndex = position26, tokenIndex26
+					if !_rules[rulesqrt]() {
+						goto l32
+					}
+					goto l26
+				l32:
 					position, tokenIndex = position26, tokenIndex26
 					if !_rules[rulesub]() {
 						goto l24
@@ -578,415 +593,452 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 		},
 		/* 6 number <- <(<('-'? [0-9]+ ('.' [0-9]*)?)> sp)> */
 		func() bool {
-			position32, tokenIndex32 := position, tokenIndex
+			position33, tokenIndex33 := position, tokenIndex
 			{
-				position33 := position
+				position34 := position
 				{
-					position34 := position
+					position35 := position
 					{
-						position35, tokenIndex35 := position, tokenIndex
+						position36, tokenIndex36 := position, tokenIndex
 						if buffer[position] != rune('-') {
-							goto l35
-						}
-						position++
-						goto l36
-					l35:
-						position, tokenIndex = position35, tokenIndex35
-					}
-				l36:
-					if c := buffer[position]; c < rune('0') || c > rune('9') {
-						goto l32
-					}
-					position++
-				l37:
-					{
-						position38, tokenIndex38 := position, tokenIndex
-						if c := buffer[position]; c < rune('0') || c > rune('9') {
-							goto l38
+							goto l36
 						}
 						position++
 						goto l37
-					l38:
-						position, tokenIndex = position38, tokenIndex38
+					l36:
+						position, tokenIndex = position36, tokenIndex36
 					}
+				l37:
+					if c := buffer[position]; c < rune('0') || c > rune('9') {
+						goto l33
+					}
+					position++
+				l38:
 					{
 						position39, tokenIndex39 := position, tokenIndex
-						if buffer[position] != rune('.') {
+						if c := buffer[position]; c < rune('0') || c > rune('9') {
 							goto l39
 						}
 						position++
-					l41:
-						{
-							position42, tokenIndex42 := position, tokenIndex
-							if c := buffer[position]; c < rune('0') || c > rune('9') {
-								goto l42
-							}
-							position++
-							goto l41
-						l42:
-							position, tokenIndex = position42, tokenIndex42
-						}
-						goto l40
+						goto l38
 					l39:
 						position, tokenIndex = position39, tokenIndex39
 					}
-				l40:
-					add(rulePegText, position34)
+					{
+						position40, tokenIndex40 := position, tokenIndex
+						if buffer[position] != rune('.') {
+							goto l40
+						}
+						position++
+					l42:
+						{
+							position43, tokenIndex43 := position, tokenIndex
+							if c := buffer[position]; c < rune('0') || c > rune('9') {
+								goto l43
+							}
+							position++
+							goto l42
+						l43:
+							position, tokenIndex = position43, tokenIndex43
+						}
+						goto l41
+					l40:
+						position, tokenIndex = position40, tokenIndex40
+					}
+				l41:
+					add(rulePegText, position35)
 				}
 				if !_rules[rulesp]() {
-					goto l32
+					goto l33
 				}
-				add(rulenumber, position33)
+				add(rulenumber, position34)
 			}
 			return true
-		l32:
-			position, tokenIndex = position32, tokenIndex32
+		l33:
+			position, tokenIndex = position33, tokenIndex33
 			return false
 		},
-		/* 7 pi <- <('p' 'i' sp)> */
+		/* 7 exp <- <(('e' 'x' 'p' open value close) / ('e' '^' value))> */
 		func() bool {
-			position43, tokenIndex43 := position, tokenIndex
+			position44, tokenIndex44 := position, tokenIndex
 			{
-				position44 := position
-				if buffer[position] != rune('p') {
-					goto l43
-				}
-				position++
-				if buffer[position] != rune('i') {
-					goto l43
-				}
-				position++
-				if !_rules[rulesp]() {
-					goto l43
-				}
-				add(rulepi, position44)
-			}
-			return true
-		l43:
-			position, tokenIndex = position43, tokenIndex43
-			return false
-		},
-		/* 8 exp <- <(('e' 'x' 'p' open value close) / ('e' '^' value))> */
-		func() bool {
-			position45, tokenIndex45 := position, tokenIndex
-			{
-				position46 := position
+				position45 := position
 				{
-					position47, tokenIndex47 := position, tokenIndex
+					position46, tokenIndex46 := position, tokenIndex
 					if buffer[position] != rune('e') {
-						goto l48
+						goto l47
 					}
 					position++
 					if buffer[position] != rune('x') {
-						goto l48
+						goto l47
 					}
 					position++
 					if buffer[position] != rune('p') {
-						goto l48
+						goto l47
 					}
 					position++
 					if !_rules[ruleopen]() {
-						goto l48
+						goto l47
 					}
 					if !_rules[rulevalue]() {
-						goto l48
+						goto l47
 					}
 					if !_rules[ruleclose]() {
-						goto l48
+						goto l47
 					}
-					goto l47
-				l48:
-					position, tokenIndex = position47, tokenIndex47
+					goto l46
+				l47:
+					position, tokenIndex = position46, tokenIndex46
 					if buffer[position] != rune('e') {
-						goto l45
+						goto l44
 					}
 					position++
 					if buffer[position] != rune('^') {
-						goto l45
+						goto l44
 					}
 					position++
 					if !_rules[rulevalue]() {
-						goto l45
+						goto l44
 					}
 				}
-			l47:
-				add(ruleexp, position46)
+			l46:
+				add(ruleexp, position45)
 			}
 			return true
-		l45:
-			position, tokenIndex = position45, tokenIndex45
+		l44:
+			position, tokenIndex = position44, tokenIndex44
 			return false
 		},
-		/* 9 log <- <('l' 'o' 'g' open value close)> */
+		/* 8 pi <- <('p' 'i' sp)> */
 		func() bool {
-			position49, tokenIndex49 := position, tokenIndex
+			position48, tokenIndex48 := position, tokenIndex
 			{
-				position50 := position
-				if buffer[position] != rune('l') {
-					goto l49
+				position49 := position
+				if buffer[position] != rune('p') {
+					goto l48
 				}
 				position++
-				if buffer[position] != rune('o') {
-					goto l49
+				if buffer[position] != rune('i') {
+					goto l48
 				}
 				position++
-				if buffer[position] != rune('g') {
-					goto l49
+				if !_rules[rulesp]() {
+					goto l48
 				}
-				position++
-				if !_rules[ruleopen]() {
-					goto l49
-				}
-				if !_rules[rulevalue]() {
-					goto l49
-				}
-				if !_rules[ruleclose]() {
-					goto l49
-				}
-				add(rulelog, position50)
+				add(rulepi, position49)
 			}
 			return true
-		l49:
-			position, tokenIndex = position49, tokenIndex49
+		l48:
+			position, tokenIndex = position48, tokenIndex48
 			return false
 		},
-		/* 10 sqrt <- <('s' 'q' 'r' 't' open value close)> */
+		/* 9 prec <- <('p' 'r' 'e' 'c' open value close)> */
 		func() bool {
-			position51, tokenIndex51 := position, tokenIndex
+			position50, tokenIndex50 := position, tokenIndex
 			{
-				position52 := position
-				if buffer[position] != rune('s') {
-					goto l51
-				}
-				position++
-				if buffer[position] != rune('q') {
-					goto l51
+				position51 := position
+				if buffer[position] != rune('p') {
+					goto l50
 				}
 				position++
 				if buffer[position] != rune('r') {
-					goto l51
+					goto l50
+				}
+				position++
+				if buffer[position] != rune('e') {
+					goto l50
+				}
+				position++
+				if buffer[position] != rune('c') {
+					goto l50
+				}
+				position++
+				if !_rules[ruleopen]() {
+					goto l50
+				}
+				if !_rules[rulevalue]() {
+					goto l50
+				}
+				if !_rules[ruleclose]() {
+					goto l50
+				}
+				add(ruleprec, position51)
+			}
+			return true
+		l50:
+			position, tokenIndex = position50, tokenIndex50
+			return false
+		},
+		/* 10 log <- <('l' 'o' 'g' open value close)> */
+		func() bool {
+			position52, tokenIndex52 := position, tokenIndex
+			{
+				position53 := position
+				if buffer[position] != rune('l') {
+					goto l52
+				}
+				position++
+				if buffer[position] != rune('o') {
+					goto l52
+				}
+				position++
+				if buffer[position] != rune('g') {
+					goto l52
+				}
+				position++
+				if !_rules[ruleopen]() {
+					goto l52
+				}
+				if !_rules[rulevalue]() {
+					goto l52
+				}
+				if !_rules[ruleclose]() {
+					goto l52
+				}
+				add(rulelog, position53)
+			}
+			return true
+		l52:
+			position, tokenIndex = position52, tokenIndex52
+			return false
+		},
+		/* 11 sqrt <- <('s' 'q' 'r' 't' open value close)> */
+		func() bool {
+			position54, tokenIndex54 := position, tokenIndex
+			{
+				position55 := position
+				if buffer[position] != rune('s') {
+					goto l54
+				}
+				position++
+				if buffer[position] != rune('q') {
+					goto l54
+				}
+				position++
+				if buffer[position] != rune('r') {
+					goto l54
 				}
 				position++
 				if buffer[position] != rune('t') {
-					goto l51
+					goto l54
 				}
 				position++
 				if !_rules[ruleopen]() {
-					goto l51
+					goto l54
 				}
 				if !_rules[rulevalue]() {
-					goto l51
+					goto l54
 				}
 				if !_rules[ruleclose]() {
-					goto l51
+					goto l54
 				}
-				add(rulesqrt, position52)
+				add(rulesqrt, position55)
 			}
 			return true
-		l51:
-			position, tokenIndex = position51, tokenIndex51
+		l54:
+			position, tokenIndex = position54, tokenIndex54
 			return false
 		},
-		/* 11 sub <- <(open e1 close)> */
+		/* 12 sub <- <(open e1 close)> */
 		func() bool {
-			position53, tokenIndex53 := position, tokenIndex
+			position56, tokenIndex56 := position, tokenIndex
 			{
-				position54 := position
+				position57 := position
 				if !_rules[ruleopen]() {
-					goto l53
+					goto l56
 				}
 				if !_rules[rulee1]() {
-					goto l53
+					goto l56
 				}
 				if !_rules[ruleclose]() {
-					goto l53
+					goto l56
 				}
-				add(rulesub, position54)
+				add(rulesub, position57)
 			}
 			return true
-		l53:
-			position, tokenIndex = position53, tokenIndex53
+		l56:
+			position, tokenIndex = position56, tokenIndex56
 			return false
 		},
-		/* 12 add <- <('+' sp)> */
+		/* 13 add <- <('+' sp)> */
 		func() bool {
-			position55, tokenIndex55 := position, tokenIndex
+			position58, tokenIndex58 := position, tokenIndex
 			{
-				position56 := position
+				position59 := position
 				if buffer[position] != rune('+') {
-					goto l55
+					goto l58
 				}
 				position++
 				if !_rules[rulesp]() {
-					goto l55
+					goto l58
 				}
-				add(ruleadd, position56)
+				add(ruleadd, position59)
 			}
 			return true
-		l55:
-			position, tokenIndex = position55, tokenIndex55
+		l58:
+			position, tokenIndex = position58, tokenIndex58
 			return false
 		},
-		/* 13 minus <- <('-' sp)> */
+		/* 14 minus <- <('-' sp)> */
 		func() bool {
-			position57, tokenIndex57 := position, tokenIndex
+			position60, tokenIndex60 := position, tokenIndex
 			{
-				position58 := position
+				position61 := position
 				if buffer[position] != rune('-') {
-					goto l57
+					goto l60
 				}
 				position++
 				if !_rules[rulesp]() {
-					goto l57
+					goto l60
 				}
-				add(ruleminus, position58)
+				add(ruleminus, position61)
 			}
 			return true
-		l57:
-			position, tokenIndex = position57, tokenIndex57
+		l60:
+			position, tokenIndex = position60, tokenIndex60
 			return false
 		},
-		/* 14 multiply <- <('*' sp)> */
+		/* 15 multiply <- <('*' sp)> */
 		func() bool {
-			position59, tokenIndex59 := position, tokenIndex
+			position62, tokenIndex62 := position, tokenIndex
 			{
-				position60 := position
+				position63 := position
 				if buffer[position] != rune('*') {
-					goto l59
+					goto l62
 				}
 				position++
 				if !_rules[rulesp]() {
-					goto l59
+					goto l62
 				}
-				add(rulemultiply, position60)
+				add(rulemultiply, position63)
 			}
 			return true
-		l59:
-			position, tokenIndex = position59, tokenIndex59
+		l62:
+			position, tokenIndex = position62, tokenIndex62
 			return false
 		},
-		/* 15 divide <- <('/' sp)> */
+		/* 16 divide <- <('/' sp)> */
 		func() bool {
-			position61, tokenIndex61 := position, tokenIndex
+			position64, tokenIndex64 := position, tokenIndex
 			{
-				position62 := position
+				position65 := position
 				if buffer[position] != rune('/') {
-					goto l61
+					goto l64
 				}
 				position++
 				if !_rules[rulesp]() {
-					goto l61
+					goto l64
 				}
-				add(ruledivide, position62)
+				add(ruledivide, position65)
 			}
 			return true
-		l61:
-			position, tokenIndex = position61, tokenIndex61
+		l64:
+			position, tokenIndex = position64, tokenIndex64
 			return false
 		},
-		/* 16 modulus <- <('%' sp)> */
+		/* 17 modulus <- <('%' sp)> */
 		func() bool {
-			position63, tokenIndex63 := position, tokenIndex
+			position66, tokenIndex66 := position, tokenIndex
 			{
-				position64 := position
+				position67 := position
 				if buffer[position] != rune('%') {
-					goto l63
+					goto l66
 				}
 				position++
 				if !_rules[rulesp]() {
-					goto l63
+					goto l66
 				}
-				add(rulemodulus, position64)
+				add(rulemodulus, position67)
 			}
 			return true
-		l63:
-			position, tokenIndex = position63, tokenIndex63
+		l66:
+			position, tokenIndex = position66, tokenIndex66
 			return false
 		},
-		/* 17 exponentiation <- <('^' sp)> */
+		/* 18 exponentiation <- <('^' sp)> */
 		func() bool {
-			position65, tokenIndex65 := position, tokenIndex
+			position68, tokenIndex68 := position, tokenIndex
 			{
-				position66 := position
+				position69 := position
 				if buffer[position] != rune('^') {
-					goto l65
+					goto l68
 				}
 				position++
 				if !_rules[rulesp]() {
-					goto l65
+					goto l68
 				}
-				add(ruleexponentiation, position66)
+				add(ruleexponentiation, position69)
 			}
 			return true
-		l65:
-			position, tokenIndex = position65, tokenIndex65
+		l68:
+			position, tokenIndex = position68, tokenIndex68
 			return false
 		},
-		/* 18 open <- <('(' sp)> */
+		/* 19 open <- <('(' sp)> */
 		func() bool {
-			position67, tokenIndex67 := position, tokenIndex
+			position70, tokenIndex70 := position, tokenIndex
 			{
-				position68 := position
+				position71 := position
 				if buffer[position] != rune('(') {
-					goto l67
+					goto l70
 				}
 				position++
 				if !_rules[rulesp]() {
-					goto l67
+					goto l70
 				}
-				add(ruleopen, position68)
+				add(ruleopen, position71)
 			}
 			return true
-		l67:
-			position, tokenIndex = position67, tokenIndex67
+		l70:
+			position, tokenIndex = position70, tokenIndex70
 			return false
 		},
-		/* 19 close <- <(')' sp)> */
+		/* 20 close <- <(')' sp)> */
 		func() bool {
-			position69, tokenIndex69 := position, tokenIndex
+			position72, tokenIndex72 := position, tokenIndex
 			{
-				position70 := position
+				position73 := position
 				if buffer[position] != rune(')') {
-					goto l69
+					goto l72
 				}
 				position++
 				if !_rules[rulesp]() {
-					goto l69
+					goto l72
 				}
-				add(ruleclose, position70)
+				add(ruleclose, position73)
 			}
 			return true
-		l69:
-			position, tokenIndex = position69, tokenIndex69
+		l72:
+			position, tokenIndex = position72, tokenIndex72
 			return false
 		},
-		/* 20 sp <- <(' ' / '\t')*> */
+		/* 21 sp <- <(' ' / '\t')*> */
 		func() bool {
 			{
-				position72 := position
-			l73:
+				position75 := position
+			l76:
 				{
-					position74, tokenIndex74 := position, tokenIndex
+					position77, tokenIndex77 := position, tokenIndex
 					{
-						position75, tokenIndex75 := position, tokenIndex
+						position78, tokenIndex78 := position, tokenIndex
 						if buffer[position] != rune(' ') {
-							goto l76
+							goto l79
 						}
 						position++
-						goto l75
-					l76:
-						position, tokenIndex = position75, tokenIndex75
+						goto l78
+					l79:
+						position, tokenIndex = position78, tokenIndex78
 						if buffer[position] != rune('\t') {
-							goto l74
+							goto l77
 						}
 						position++
 					}
-				l75:
-					goto l73
-				l74:
-					position, tokenIndex = position74, tokenIndex74
+				l78:
+					goto l76
+				l77:
+					position, tokenIndex = position77, tokenIndex77
 				}
-				add(rulesp, position72)
+				add(rulesp, position75)
 			}
 			return true
 		},

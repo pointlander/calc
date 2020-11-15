@@ -11,6 +11,8 @@ import (
 	"github.com/ALTree/bigfloat"
 )
 
+var prec uint = 1024
+
 func (c *Calculator) Eval() *big.Rat {
 	return c.Rulee(c.AST())
 }
@@ -85,10 +87,11 @@ func (c *Calculator) Rulee3(node *node32) *big.Rat {
 		case ruleexponentiation:
 			node = node.next
 			b := c.Rulee4(node)
-			x, _, _ := big.ParseFloat(a.FloatString(1024), 10, 1024, big.ToNearestEven)
-			y, _, _ := big.ParseFloat(b.FloatString(1024), 10, 1024, big.ToNearestEven)
-			pow := bigfloat.Pow(x, y)
-			a.SetString(pow.String())
+			x := big.NewFloat(0).SetPrec(prec)
+			x.SetRat(a)
+			y := big.NewFloat(0).SetPrec(prec)
+			y.SetRat(b)
+			bigfloat.Pow(x, y).Rat(a)
 		}
 		node = node.next
 	}
@@ -122,56 +125,67 @@ func (c *Calculator) Rulevalue(node *node32) *big.Rat {
 			a := big.NewRat(1, 1)
 			a.SetString(strings.TrimSpace(string(c.buffer[node.begin:node.end])))
 			return a
-		case rulepi:
-			// https://en.wikipedia.org/wiki/Gauss%E2%80%93Legendre_algorithm
-			a, b, t, p :=
-				big.NewFloat(1).SetPrec(1024), big.NewFloat(1).SetPrec(1024),
-				big.NewFloat(1).SetPrec(1024), big.NewFloat(1).SetPrec(1024)
-			b = b.Quo(b, bigfloat.Sqrt(big.NewFloat(2).SetPrec(1024)))
-			t = t.Quo(t, big.NewFloat(4).SetPrec(1024))
-			for {
-				an := big.NewFloat(0).SetPrec(1024)
-				an.Add(a, b)
-				an.Quo(an, big.NewFloat(2).SetPrec(1024))
-
-				bn := big.NewFloat(0).SetPrec(1024)
-				bn.Mul(a, b)
-				bn = bigfloat.Sqrt(bn)
-
-				diff := big.NewFloat(0).SetPrec(1024)
-				diff.Sub(a, b)
-				diffn := big.NewFloat(0).SetPrec(1024)
-				diffn.Sub(an, bn)
-				if diff.Cmp(diffn) == 0 {
-					break
-				}
-
-				tn := big.NewFloat(0).SetPrec(1024)
-				tn.Sub(a, an)
-				tn.Mul(tn, tn)
-				tn.Mul(tn, p)
-				tn.Sub(t, tn)
-
-				pn := big.NewFloat(0).SetPrec(1024)
-				pn.Mul(p, big.NewFloat(2).SetPrec(1024))
-
-				a, b, t, p = an, bn, tn, pn
-			}
-			pi := big.NewFloat(0).SetPrec(1024)
-			pi.Add(a, b)
-			pi.Mul(pi, pi)
-			pi.Quo(pi, t.Mul(t, big.NewFloat(4).SetPrec(1024)))
-			x := big.NewRat(1, 1)
-			x.SetString(pi.Text('f', 1024))
-			return x
 		case ruleexp:
 			node := node.up
 			for node != nil {
 				if node.pegRule == rulevalue {
 					a := c.Rulevalue(node)
-					x, _, _ := big.ParseFloat(a.FloatString(1024), 10, 1024, big.ToNearestEven)
-					exp := bigfloat.Exp(x)
-					a.SetString(exp.String())
+					x := big.NewFloat(0).SetPrec(prec)
+					x.SetRat(a)
+					bigfloat.Exp(x).Rat(a)
+					return a
+				}
+				node = node.next
+			}
+		case rulepi:
+			// https://en.wikipedia.org/wiki/Gauss%E2%80%93Legendre_algorithm
+			two, four := big.NewFloat(2).SetPrec(prec), big.NewFloat(4).SetPrec(prec)
+			a, b, t, p :=
+				big.NewFloat(1).SetPrec(prec), big.NewFloat(1).SetPrec(prec),
+				big.NewFloat(1).SetPrec(prec), big.NewFloat(1).SetPrec(prec)
+			b = b.Quo(b, bigfloat.Sqrt(two))
+			t = t.Quo(t, four)
+			for {
+				an := big.NewFloat(0).SetPrec(prec)
+				an.Add(a, b)
+				an.Quo(an, two)
+
+				bn := big.NewFloat(0).SetPrec(prec)
+				bn.Mul(a, b)
+				bn = bigfloat.Sqrt(bn)
+
+				diff := big.NewFloat(0).SetPrec(prec)
+				diff.Sub(a, b)
+				diffn := big.NewFloat(0).SetPrec(prec)
+				diffn.Sub(an, bn)
+				if diff.Cmp(diffn) == 0 {
+					break
+				}
+
+				tn := big.NewFloat(0).SetPrec(prec)
+				tn.Sub(a, an)
+				tn.Mul(tn, tn)
+				tn.Mul(tn, p)
+				tn.Sub(t, tn)
+
+				pn := big.NewFloat(0).SetPrec(prec)
+				pn.Mul(p, two)
+
+				a, b, t, p = an, bn, tn, pn
+			}
+			pi := big.NewFloat(0).SetPrec(prec)
+			pi.Add(a, b)
+			pi.Mul(pi, pi)
+			pi.Quo(pi, t.Mul(t, four))
+			x := big.NewRat(1, 1)
+			x.SetString(pi.Text('f', int(prec)))
+			return x
+		case ruleprec:
+			node := node.up
+			for node != nil {
+				if node.pegRule == rulevalue {
+					a := c.Rulevalue(node)
+					prec = uint(a.Num().Uint64())
 					return a
 				}
 				node = node.next
@@ -181,9 +195,9 @@ func (c *Calculator) Rulevalue(node *node32) *big.Rat {
 			for node != nil {
 				if node.pegRule == rulevalue {
 					a := c.Rulevalue(node)
-					x, _, _ := big.ParseFloat(a.FloatString(1024), 10, 1024, big.ToNearestEven)
-					log := bigfloat.Log(x)
-					a.SetString(log.String())
+					x := big.NewFloat(0).SetPrec(prec)
+					x.SetRat(a)
+					bigfloat.Log(x).Rat(a)
 					return a
 				}
 				node = node.next
@@ -193,9 +207,9 @@ func (c *Calculator) Rulevalue(node *node32) *big.Rat {
 			for node != nil {
 				if node.pegRule == rulevalue {
 					a := c.Rulevalue(node)
-					x, _, _ := big.ParseFloat(a.FloatString(1024), 10, 1024, big.ToNearestEven)
-					sqrt := bigfloat.Sqrt(x)
-					a.SetString(sqrt.String())
+					x := big.NewFloat(0).SetPrec(prec)
+					x.SetRat(a)
+					bigfloat.Sqrt(x).Rat(a)
 					return a
 				}
 				node = node.next
