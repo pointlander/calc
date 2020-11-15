@@ -5,6 +5,7 @@
 package main
 
 import (
+	"fmt"
 	"math/big"
 	"strings"
 
@@ -122,6 +123,49 @@ func (c *Calculator) Rulevalue(node *node32) *big.Rat {
 			a := big.NewRat(1, 1)
 			a.SetString(strings.TrimSpace(string(c.buffer[node.begin:node.end])))
 			return a
+		case rulepi:
+			// https://en.wikipedia.org/wiki/Gauss%E2%80%93Legendre_algorithm
+			a, b, t, p :=
+				big.NewFloat(1).SetPrec(1024), big.NewFloat(1).SetPrec(1024),
+				big.NewFloat(1).SetPrec(1024), big.NewFloat(1).SetPrec(1024)
+			b = b.Quo(b, bigfloat.Sqrt(big.NewFloat(2).SetPrec(1024)))
+			t = t.Quo(t, big.NewFloat(4).SetPrec(1024))
+			for {
+				an := big.NewFloat(0).SetPrec(1024)
+				an.Add(a, b)
+				an.Quo(an, big.NewFloat(2).SetPrec(1024))
+
+				bn := big.NewFloat(0).SetPrec(1024)
+				bn.Mul(a, b)
+				bn = bigfloat.Sqrt(bn)
+
+				diff := big.NewFloat(0).SetPrec(1024)
+				diff.Sub(a, b)
+				diffn := big.NewFloat(0).SetPrec(1024)
+				diffn.Sub(an, bn)
+				fmt.Println(diff.String())
+				if diff.Cmp(diffn) == 0 {
+					break
+				}
+
+				tn := big.NewFloat(0).SetPrec(1024)
+				tn.Sub(a, an)
+				tn.Mul(tn, tn)
+				tn.Mul(tn, p)
+				tn.Sub(t, tn)
+
+				pn := big.NewFloat(0).SetPrec(1024)
+				pn.Mul(p, big.NewFloat(2).SetPrec(1024))
+
+				a, b, t, p = an, bn, tn, pn
+			}
+			pi := big.NewFloat(0).SetPrec(1024)
+			pi.Add(a, b)
+			pi.Mul(pi, pi)
+			pi.Quo(pi, t.Mul(t, big.NewFloat(4).SetPrec(1024)))
+			x := big.NewRat(1, 1)
+			x.SetString(pi.Text('f', 1024))
+			return x
 		case ruleexp:
 			node := node.up
 			for node != nil {

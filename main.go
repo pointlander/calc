@@ -30,7 +30,7 @@ func main() {
 			continue
 		}
 		result := calc.Eval()
-		decimal, _ := result.Float64()
-		fmt.Printf("%s = %f\n", result.String(), decimal)
+		decimal := result.FloatString(1024)
+		fmt.Printf("%s = %s\n", result.String(), decimal)
 	}
 }
