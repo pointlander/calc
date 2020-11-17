@@ -138,48 +138,9 @@ func (c *Calculator) Rulevalue(node *node32) *big.Rat {
 				node = node.next
 			}
 		case rulepi:
-			// https://en.wikipedia.org/wiki/Gauss%E2%80%93Legendre_algorithm
-			two, four := big.NewFloat(2).SetPrec(prec), big.NewFloat(4).SetPrec(prec)
-			a, b, t, p :=
-				big.NewFloat(1).SetPrec(prec), big.NewFloat(1).SetPrec(prec),
-				big.NewFloat(1).SetPrec(prec), big.NewFloat(1).SetPrec(prec)
-			b = b.Quo(b, bigfloat.Sqrt(two))
-			t = t.Quo(t, four)
-			for {
-				an := big.NewFloat(0).SetPrec(prec)
-				an.Add(a, b)
-				an.Quo(an, two)
-
-				bn := big.NewFloat(0).SetPrec(prec)
-				bn.Mul(a, b)
-				bn = bigfloat.Sqrt(bn)
-
-				diff := big.NewFloat(0).SetPrec(prec)
-				diff.Sub(a, b)
-				diffn := big.NewFloat(0).SetPrec(prec)
-				diffn.Sub(an, bn)
-				if diff.Cmp(diffn) == 0 {
-					break
-				}
-
-				tn := big.NewFloat(0).SetPrec(prec)
-				tn.Sub(a, an)
-				tn.Mul(tn, tn)
-				tn.Mul(tn, p)
-				tn.Sub(t, tn)
-
-				pn := big.NewFloat(0).SetPrec(prec)
-				pn.Mul(p, two)
-
-				a, b, t, p = an, bn, tn, pn
-			}
-			pi := big.NewFloat(0).SetPrec(prec)
-			pi.Add(a, b)
-			pi.Mul(pi, pi)
-			pi.Quo(pi, t.Mul(t, four))
-			x := big.NewRat(1, 1)
-			x.SetString(pi.Text('f', int(prec)))
-			return x
+			a := big.NewRat(1, 1)
+			bigfloat.PI(prec).Rat(a)
+			return a
 		case ruleprec:
 			node := node.up
 			for node != nil {
