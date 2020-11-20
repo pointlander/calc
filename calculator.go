@@ -125,7 +125,19 @@ func (c *Calculator) Rulevalue(node *node32) *big.Rat {
 			a := big.NewRat(1, 1)
 			a.SetString(strings.TrimSpace(string(c.buffer[node.begin:node.end])))
 			return a
-		case ruleexp:
+		case ruleexp1:
+			node := node.up
+			for node != nil {
+				if node.pegRule == rulee1 {
+					a := c.Rulee1(node)
+					x := big.NewFloat(0).SetPrec(prec)
+					x.SetRat(a)
+					bigfloat.Exp(x).Rat(a)
+					return a
+				}
+				node = node.next
+			}
+		case ruleexp2:
 			node := node.up
 			for node != nil {
 				if node.pegRule == rulevalue {
@@ -144,8 +156,8 @@ func (c *Calculator) Rulevalue(node *node32) *big.Rat {
 		case ruleprec:
 			node := node.up
 			for node != nil {
-				if node.pegRule == rulevalue {
-					a := c.Rulevalue(node)
+				if node.pegRule == rulee1 {
+					a := c.Rulee1(node)
 					prec = uint(a.Num().Uint64())
 					return a
 				}
@@ -154,8 +166,8 @@ func (c *Calculator) Rulevalue(node *node32) *big.Rat {
 		case rulelog:
 			node := node.up
 			for node != nil {
-				if node.pegRule == rulevalue {
-					a := c.Rulevalue(node)
+				if node.pegRule == rulee1 {
+					a := c.Rulee1(node)
 					x := big.NewFloat(0).SetPrec(prec)
 					x.SetRat(a)
 					bigfloat.Log(x).Rat(a)
@@ -166,8 +178,8 @@ func (c *Calculator) Rulevalue(node *node32) *big.Rat {
 		case rulesqrt:
 			node := node.up
 			for node != nil {
-				if node.pegRule == rulevalue {
-					a := c.Rulevalue(node)
+				if node.pegRule == rulee1 {
+					a := c.Rulee1(node)
 					x := big.NewFloat(0).SetPrec(prec)
 					x.SetRat(a)
 					bigfloat.Sqrt(x).Rat(a)
