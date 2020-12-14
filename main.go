@@ -30,7 +30,8 @@ func main() {
 			continue
 		}
 		result := calc.Eval()
-		decimal := result.FloatString(int(prec))
-		fmt.Printf("%s = %s\n", result.String(), decimal)
+		real := result.A.FloatString(int(prec))
+		imaginary := result.B.FloatString(int(prec))
+		fmt.Printf("%s = %s + %si\n", result.String(), real, imaginary)
 	}
 }

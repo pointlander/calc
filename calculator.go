@@ -9,15 +9,16 @@ import (
 	"strings"
 
 	"github.com/ALTree/bigfloat"
+	complex "github.com/pointlander/big"
 )
 
 var prec uint = 1024
 
-func (c *Calculator) Eval() *big.Rat {
+func (c *Calculator) Eval() *complex.Rational {
 	return c.Rulee(c.AST())
 }
 
-func (c *Calculator) Rulee(node *node32) *big.Rat {
+func (c *Calculator) Rulee(node *node32) *complex.Rational {
 	node = node.up
 	for node != nil {
 		switch node.pegRule {
@@ -29,9 +30,9 @@ func (c *Calculator) Rulee(node *node32) *big.Rat {
 	return nil
 }
 
-func (c *Calculator) Rulee1(node *node32) *big.Rat {
+func (c *Calculator) Rulee1(node *node32) *complex.Rational {
 	node = node.up
-	var a *big.Rat
+	var a *complex.Rational
 	for node != nil {
 		switch node.pegRule {
 		case rulee2:
@@ -50,9 +51,9 @@ func (c *Calculator) Rulee1(node *node32) *big.Rat {
 	return a
 }
 
-func (c *Calculator) Rulee2(node *node32) *big.Rat {
+func (c *Calculator) Rulee2(node *node32) *complex.Rational {
 	node = node.up
-	var a *big.Rat
+	var a *complex.Rational
 	for node != nil {
 		switch node.pegRule {
 		case rulee3:
@@ -64,12 +65,12 @@ func (c *Calculator) Rulee2(node *node32) *big.Rat {
 		case ruledivide:
 			node = node.next
 			b := c.Rulee3(node)
-			a.Quo(a, b)
+			a.Div(a, b)
 		case rulemodulus:
 			node = node.next
 			b := c.Rulee3(node)
-			if a.Denom().Cmp(big.NewInt(1)) == 0 && b.Denom().Cmp(big.NewInt(1)) == 0 {
-				a.Num().Mod(a.Num(), b.Num())
+			if a.A.Denom().Cmp(big.NewInt(1)) == 0 && b.A.Denom().Cmp(big.NewInt(1)) == 0 {
+				a.A.Num().Mod(a.A.Num(), b.A.Num())
 			}
 		}
 		node = node.next
@@ -77,9 +78,9 @@ func (c *Calculator) Rulee2(node *node32) *big.Rat {
 	return a
 }
 
-func (c *Calculator) Rulee3(node *node32) *big.Rat {
+func (c *Calculator) Rulee3(node *node32) *complex.Rational {
 	node = node.up
-	var a *big.Rat
+	var a *complex.Rational
 	for node != nil {
 		switch node.pegRule {
 		case rulee4:
@@ -87,18 +88,18 @@ func (c *Calculator) Rulee3(node *node32) *big.Rat {
 		case ruleexponentiation:
 			node = node.next
 			b := c.Rulee4(node)
-			x := big.NewFloat(0).SetPrec(prec)
+			x := complex.NewFloat(big.NewFloat(0).SetPrec(prec), big.NewFloat(0).SetPrec(prec))
 			x.SetRat(a)
-			y := big.NewFloat(0).SetPrec(prec)
+			y := complex.NewFloat(big.NewFloat(0).SetPrec(prec), big.NewFloat(0).SetPrec(prec))
 			y.SetRat(b)
-			bigfloat.Pow(x, y).Rat(a)
+			x.Pow(x, y).Rat(a)
 		}
 		node = node.next
 	}
 	return a
 }
 
-func (c *Calculator) Rulee4(node *node32) *big.Rat {
+func (c *Calculator) Rulee4(node *node32) *complex.Rational {
 	node = node.up
 	minus := false
 	for node != nil {
@@ -117,22 +118,26 @@ func (c *Calculator) Rulee4(node *node32) *big.Rat {
 	return nil
 }
 
-func (c *Calculator) Rulevalue(node *node32) *big.Rat {
+func (c *Calculator) Rulevalue(node *node32) *complex.Rational {
 	node = node.up
 	for node != nil {
 		switch node.pegRule {
+		case ruleimaginary:
+			a := complex.NewRational(big.NewRat(0, 1), big.NewRat(1, 1))
+			a.B.SetString(strings.TrimSpace(string(c.buffer[node.begin:node.end])))
+			return a
 		case rulenumber:
-			a := big.NewRat(1, 1)
-			a.SetString(strings.TrimSpace(string(c.buffer[node.begin:node.end])))
+			a := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
+			a.A.SetString(strings.TrimSpace(string(c.buffer[node.begin:node.end])))
 			return a
 		case ruleexp1:
 			node := node.up
 			for node != nil {
 				if node.pegRule == rulee1 {
 					a := c.Rulee1(node)
-					x := big.NewFloat(0).SetPrec(prec)
+					x := complex.NewFloat(big.NewFloat(0).SetPrec(prec), big.NewFloat(0).SetPrec(prec))
 					x.SetRat(a)
-					bigfloat.Exp(x).Rat(a)
+					x.Exp(x).Rat(a)
 					return a
 				}
 				node = node.next
@@ -142,9 +147,9 @@ func (c *Calculator) Rulevalue(node *node32) *big.Rat {
 			for node != nil {
 				if node.pegRule == rulevalue {
 					a := c.Rulevalue(node)
-					x := big.NewFloat(0).SetPrec(prec)
+					x := complex.NewFloat(big.NewFloat(0).SetPrec(prec), big.NewFloat(0).SetPrec(prec))
 					x.SetRat(a)
-					bigfloat.Exp(x).Rat(a)
+					x.Exp(x).Rat(a)
 					return a
 				}
 				node = node.next
@@ -152,13 +157,14 @@ func (c *Calculator) Rulevalue(node *node32) *big.Rat {
 		case rulepi:
 			a := big.NewRat(1, 1)
 			bigfloat.PI(prec).Rat(a)
-			return a
+			b := complex.NewRational(a, big.NewRat(0, 1))
+			return b
 		case ruleprec:
 			node := node.up
 			for node != nil {
 				if node.pegRule == rulee1 {
 					a := c.Rulee1(node)
-					prec = uint(a.Num().Uint64())
+					prec = uint(a.A.Num().Uint64())
 					return a
 				}
 				node = node.next
@@ -168,9 +174,9 @@ func (c *Calculator) Rulevalue(node *node32) *big.Rat {
 			for node != nil {
 				if node.pegRule == rulee1 {
 					a := c.Rulee1(node)
-					x := big.NewFloat(0).SetPrec(prec)
+					x := complex.NewFloat(big.NewFloat(0).SetPrec(prec), big.NewFloat(0).SetPrec(prec))
 					x.SetRat(a)
-					bigfloat.Log(x).Rat(a)
+					x.Log(x).Rat(a)
 					return a
 				}
 				node = node.next
@@ -180,9 +186,9 @@ func (c *Calculator) Rulevalue(node *node32) *big.Rat {
 			for node != nil {
 				if node.pegRule == rulee1 {
 					a := c.Rulee1(node)
-					x := big.NewFloat(0).SetPrec(prec)
+					x := complex.NewFloat(big.NewFloat(0).SetPrec(prec), big.NewFloat(0).SetPrec(prec))
 					x.SetRat(a)
-					bigfloat.Sqrt(x).Rat(a)
+					x.Sqrt(x).Rat(a)
 					return a
 				}
 				node = node.next
@@ -195,7 +201,7 @@ func (c *Calculator) Rulevalue(node *node32) *big.Rat {
 	return nil
 }
 
-func (c *Calculator) Rulesub(node *node32) *big.Rat {
+func (c *Calculator) Rulesub(node *node32) *complex.Rational {
 	node = node.up
 	for node != nil {
 		switch node.pegRule {
