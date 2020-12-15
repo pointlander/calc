@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/ALTree/bigfloat"
-	complex "github.com/pointlander/big"
+	complex "github.com/pointlander/c0mpl3x"
 )
 
 var prec uint = 1024

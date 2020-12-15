@@ -9,7 +9,7 @@ import (
 	"math/big"
 
 	"github.com/c-bata/go-prompt"
-	complex "github.com/pointlander/big"
+	complex "github.com/pointlander/c0mpl3x"
 )
 
 func completer(d prompt.Document) []prompt.Suggest {
