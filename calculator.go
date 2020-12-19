@@ -193,6 +193,30 @@ func (c *Calculator) Rulevalue(node *node32) *complex.Rational {
 				}
 				node = node.next
 			}
+		case rulecos:
+			node := node.up
+			for node != nil {
+				if node.pegRule == rulee1 {
+					a := c.Rulee1(node)
+					x := complex.NewFloat(big.NewFloat(0).SetPrec(prec), big.NewFloat(0).SetPrec(prec))
+					x.SetRat(a)
+					x.Cos(x).Rat(a)
+					return a
+				}
+				node = node.next
+			}
+		case rulesin:
+			node := node.up
+			for node != nil {
+				if node.pegRule == rulee1 {
+					a := c.Rulee1(node)
+					x := complex.NewFloat(big.NewFloat(0).SetPrec(prec), big.NewFloat(0).SetPrec(prec))
+					x.SetRat(a)
+					x.Sin(x).Rat(a)
+					return a
+				}
+				node = node.next
+			}
 		case rulesub:
 			return c.Rulesub(node)
 		}

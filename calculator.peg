@@ -27,6 +27,8 @@ value <- imaginary
        / prec
        / log
        / sqrt
+       / cos
+       / sin
        / sub
 imaginary <- < [-]? [0-9]+ ([.] [0-9]*)? > 'i' sp
 number <- < [-]? [0-9]+ ([.] [0-9]*)? > sp
@@ -36,6 +38,8 @@ pi <- 'pi' sp
 prec <- 'prec' open e1 close
 log <- 'log' open e1 close
 sqrt <- 'sqrt' open e1 close
+cos <- 'cos' open e1 close
+sin <- 'sin' open e1 close
 sub <- open e1 close
 add <- '+' sp
 minus <- '-' sp

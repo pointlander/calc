@@ -17,6 +17,8 @@ github.com/pointlander/bigfloat v0.0.0-20201211040007-2034219fcdd4 h1:Uu2OrXR+yf
 github.com/pointlander/bigfloat v0.0.0-20201211040007-2034219fcdd4/go.mod h1:b19QN7yorMusM5S22nrPQHtgQFz7eFaZVEDQUE0N+tA=
 github.com/pointlander/c0mpl3x v0.0.0-20201215051153-3832028b3b40 h1:K3FtMBTZTfIcajcDXU7ARbvBhcHqRLkQecLaBVfvZZc=
 github.com/pointlander/c0mpl3x v0.0.0-20201215051153-3832028b3b40/go.mod h1:Ou+gTDOjSDEOqW6i1ntvzbh44CoOuT25T+bUzejr06Y=
+github.com/pointlander/c0mpl3x v0.0.0-20201219073527-5aeb11c637bd h1:scMElrhSxY36DqebjN3Ughvtmjlse/HVVxLpiZ8T9+k=
+github.com/pointlander/c0mpl3x v0.0.0-20201219073527-5aeb11c637bd/go.mod h1:Ou+gTDOjSDEOqW6i1ntvzbh44CoOuT25T+bUzejr06Y=
 golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sys v0.0.0-20190222072716-a9d3bda3a223/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
 golang.org/x/sys v0.0.0-20191008105621-543471e840be/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
