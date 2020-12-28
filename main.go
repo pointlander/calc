@@ -31,6 +31,6 @@ func main() {
 			continue
 		}
 		result := calc.Eval()
-		fmt.Printf("%s\n", result.String(prec))
+		fmt.Printf("%s\n", result.String())
 	}
 }
