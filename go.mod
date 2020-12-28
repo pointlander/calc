@@ -7,5 +7,5 @@ replace github.com/ALTree/bigfloat => github.com/pointlander/bigfloat v0.0.0-202
 require (
 	github.com/ALTree/bigfloat v0.0.0-20180506151649-b176f1e721fc
 	github.com/c-bata/go-prompt v0.2.5
-	github.com/pointlander/c0mpl3x v0.0.0-20201227235453-d73d5de28633
+	github.com/pointlander/c0mpl3x v0.0.0-20201228043924-fd9256f5c381
 )
