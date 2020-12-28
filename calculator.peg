@@ -19,7 +19,8 @@ e3 <- e4 ( exponentiation e4
          )*
 e4 <- minus value
     / value
-value <- imaginary
+value <- matrix
+       / imaginary
        / number
        / exp1
        / exp2
@@ -31,6 +32,7 @@ value <- imaginary
        / sin
        / tan
        / sub
+matrix <- '[' sp (e1 / row)+ ']' sp 
 imaginary <- < [-]? [0-9]+ ([.] [0-9]*)? > 'i' sp
 number <- < [-]? [0-9]+ ([.] [0-9]*)? > sp
 exp1 <- 'exp' open e1 close
@@ -52,3 +54,4 @@ exponentiation <- '^' sp
 open <- '(' sp
 close <- ')' sp
 sp <- ( ' ' / '\t' )*
+row <- ';' sp

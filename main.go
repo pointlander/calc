@@ -6,10 +6,8 @@ package main
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/c-bata/go-prompt"
-	complex "github.com/pointlander/c0mpl3x"
 )
 
 func completer(d prompt.Document) []prompt.Suggest {
@@ -33,8 +31,6 @@ func main() {
 			continue
 		}
 		result := calc.Eval()
-		x := complex.NewFloat(big.NewFloat(0).SetPrec(prec), big.NewFloat(0).SetPrec(prec))
-		x.SetRat(result)
-		fmt.Printf("%s\n", x.String())
+		fmt.Printf("%s\n", result.String())
 	}
 }
