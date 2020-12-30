@@ -52,3 +52,52 @@ type Node struct {
 	Value       string
 	Left, Right *Node
 }
+
+func (n *Node) String() string {
+	var process func(n *Node) string
+	process = func(n *Node) string {
+		if n == nil {
+			return ""
+		}
+		switch n.Operation {
+		case OperationNoop:
+			return "(" + process(n.Left) + "???" + process(n.Right) + ")"
+		case OperationAdd:
+			return "(" + process(n.Left) + " + " + process(n.Right) + ")"
+		case OperationSubtract:
+			return "(" + process(n.Left) + " - " + process(n.Right) + ")"
+		case OperationMultiply:
+			return "(" + process(n.Left) + " * " + process(n.Right) + ")"
+		case OperationDivide:
+			return "(" + process(n.Left) + " / " + process(n.Right) + ")"
+		case OperationModulus:
+			return "(" + process(n.Left) + " % " + process(n.Right) + ")"
+		case OperationExponentiation:
+			return "(" + process(n.Left) + "^" + process(n.Right) + ")"
+		case OperationNegate:
+			return "-(" + process(n.Left) + ")"
+		case OperationVariable:
+			return n.Value
+		case OperationImaginary:
+			return n.Value + "i"
+		case OperationNumber:
+			return n.Value
+		case OperationNaturalExponentiation:
+			return "(e^" + process(n.Left) + ")"
+		case OperationPI:
+			return "PI"
+		case OperationNaturalLogarithm:
+			return "log(" + process(n.Left) + ")"
+		case OperationSquareRoot:
+			return "sqrt(" + process(n.Left) + ")"
+		case OperationCosine:
+			return "cos(" + process(n.Left) + ")"
+		case OperationSine:
+			return "sin(" + process(n.Left) + ")"
+		case OperationTangent:
+			return "tan(" + process(n.Left) + ")"
+		}
+		return ""
+	}
+	return process(n)
+}

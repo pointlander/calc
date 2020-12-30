@@ -5,6 +5,7 @@
 package main
 
 import (
+	"fmt"
 	"math/big"
 	"strings"
 
@@ -282,6 +283,11 @@ func (c *Calculator) Rulederivative(node *node32) *complex.Matrix {
 					Operation: OperationNegate,
 					Left:      convertValue(node),
 				}
+			case rulevariable:
+				a = &Node{
+					Operation: OperationVariable,
+					Value:     strings.TrimSpace(string(c.buffer[node.begin:node.end])),
+				}
 			case ruleimaginary:
 				a = &Node{
 					Operation: OperationImaginary,
@@ -443,7 +449,7 @@ func (c *Calculator) Rulederivative(node *node32) *complex.Matrix {
 		}
 		return a
 	}
-	convert(node)
+	fmt.Println(convert(node).String())
 	return nil
 }
 
