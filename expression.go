@@ -57,6 +57,7 @@ type Node struct {
 	Left, Right *Node
 }
 
+// String returns the string form of the equation
 func (n *Node) String() string {
 	var process func(n *Node) string
 	process = func(n *Node) string {
@@ -107,6 +108,7 @@ func (n *Node) String() string {
 }
 
 // Derivative takes the derivative of the equation
+// https://www.cs.utexas.edu/users/novak/asg-symdif.html#:~:text=Introduction,numeric%20calculations%20based%20on%20formulas.
 func (n *Node) Derivative() *Node {
 	var process func(n *Node) *Node
 	process = func(n *Node) *Node {
