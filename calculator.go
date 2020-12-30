@@ -14,10 +14,12 @@ import (
 
 var prec uint = 1024
 
+// Eval evaluates the expression
 func (c *Calculator) Eval() *complex.Matrix {
 	return c.Rulee(c.AST())
 }
 
+// Rulee is a root expresion
 func (c *Calculator) Rulee(node *node32) *complex.Matrix {
 	node = node.up
 	for node != nil {
@@ -30,6 +32,7 @@ func (c *Calculator) Rulee(node *node32) *complex.Matrix {
 	return nil
 }
 
+// Rulee1 deals with addation or subtraction
 func (c *Calculator) Rulee1(node *node32) *complex.Matrix {
 	node = node.up
 	var a *complex.Matrix
@@ -51,6 +54,7 @@ func (c *Calculator) Rulee1(node *node32) *complex.Matrix {
 	return a
 }
 
+// Rulee2 deals with multiplication, division, or modulus
 func (c *Calculator) Rulee2(node *node32) *complex.Matrix {
 	node = node.up
 	var a *complex.Matrix
@@ -78,6 +82,7 @@ func (c *Calculator) Rulee2(node *node32) *complex.Matrix {
 	return a
 }
 
+// Rulee3 deals with exponentiation
 func (c *Calculator) Rulee3(node *node32) *complex.Matrix {
 	node = node.up
 	var a *complex.Matrix
@@ -95,6 +100,7 @@ func (c *Calculator) Rulee3(node *node32) *complex.Matrix {
 	return a
 }
 
+// Rulee4 negates a number
 func (c *Calculator) Rulee4(node *node32) *complex.Matrix {
 	node = node.up
 	minus := false
@@ -114,6 +120,7 @@ func (c *Calculator) Rulee4(node *node32) *complex.Matrix {
 	return nil
 }
 
+// Rulevalue evaluates the value
 func (c *Calculator) Rulevalue(node *node32) *complex.Matrix {
 	node = node.up
 	for node != nil {
@@ -166,6 +173,15 @@ func (c *Calculator) Rulevalue(node *node32) *complex.Matrix {
 					a := c.Rulee1(node)
 					prec = uint(a.Values[0][0].A.Num().Uint64())
 					return a
+				}
+				node = node.next
+			}
+		case rulederivative:
+			node := node.up
+			for node != nil {
+				if node.pegRule == rulee1 {
+					c.Rulederivative(node)
+					return &complex.Matrix{}
 				}
 				node = node.next
 			}
@@ -227,6 +243,7 @@ func (c *Calculator) Rulevalue(node *node32) *complex.Matrix {
 	return nil
 }
 
+// Rulematrix computes the matrix
 func (c *Calculator) Rulematrix(node *node32) *complex.Matrix {
 	node = node.up
 	x := complex.NewMatrix(prec)
@@ -248,6 +265,189 @@ func (c *Calculator) Rulematrix(node *node32) *complex.Matrix {
 	return &x
 }
 
+// Rulederivative computes the symbolic derivative of a number
+func (c *Calculator) Rulederivative(node *node32) *complex.Matrix {
+	var (
+		convert      func(node *node32) (a *Node)
+		convertValue func(node *node32) (a *Node)
+	)
+	convertValue = func(node *node32) (a *Node) {
+		node = node.up
+		for node != nil {
+			switch node.pegRule {
+			case rulevalue:
+				a = convertValue(node)
+			case ruleminus:
+				a = &Node{
+					Operation: OperationNegate,
+					Left:      convertValue(node),
+				}
+			case ruleimaginary:
+				a = &Node{
+					Operation: OperationImaginary,
+					Value:     strings.TrimSpace(string(c.buffer[node.begin:node.end])),
+				}
+			case rulenumber:
+				a = &Node{
+					Operation: OperationNumber,
+					Value:     strings.TrimSpace(string(c.buffer[node.begin:node.end])),
+				}
+			case ruleexp1:
+				node := node.up
+				for node != nil {
+					if node.pegRule == rulee1 {
+						a = &Node{
+							Operation: OperationNaturalExponentiation,
+							Left:      convert(node),
+						}
+						return a
+					}
+					node = node.next
+				}
+			case ruleexp2:
+				node := node.up
+				for node != nil {
+					if node.pegRule == rulevalue {
+						a = &Node{
+							Operation: OperationNaturalExponentiation,
+							Left:      convert(node),
+						}
+						return a
+					}
+					node = node.next
+				}
+			case rulepi:
+				a = &Node{
+					Operation: OperationPI,
+				}
+				return a
+			case rulelog:
+				node := node.up
+				for node != nil {
+					if node.pegRule == rulee1 {
+						a = &Node{
+							Operation: OperationNaturalLogarithm,
+							Left:      convert(node),
+						}
+						return a
+					}
+					node = node.next
+				}
+			case rulesqrt:
+				node := node.up
+				for node != nil {
+					if node.pegRule == rulee1 {
+						a = &Node{
+							Operation: OperationSquareRoot,
+							Left:      convert(node),
+						}
+						return a
+					}
+					node = node.next
+				}
+			case rulecos:
+				node := node.up
+				for node != nil {
+					if node.pegRule == rulee1 {
+						a = &Node{
+							Operation: OperationCosine,
+							Left:      convert(node),
+						}
+						return a
+					}
+					node = node.next
+				}
+			case rulesin:
+				node := node.up
+				for node != nil {
+					if node.pegRule == rulee1 {
+						a = &Node{
+							Operation: OperationSine,
+							Left:      convert(node),
+						}
+						return a
+					}
+					node = node.next
+				}
+			case ruletan:
+				node := node.up
+				for node != nil {
+					if node.pegRule == rulee1 {
+						a = &Node{
+							Operation: OperationTangent,
+							Left:      convert(node),
+						}
+						return a
+					}
+					node = node.next
+				}
+			case rulesub:
+				return convert(node)
+			}
+			node = node.next
+		}
+		return a
+	}
+	convert = func(node *node32) (a *Node) {
+		node = node.up
+		for node != nil {
+			switch node.pegRule {
+			case rulee2, rulee3:
+				a = convert(node)
+			case ruleadd:
+				node = node.next
+				a = &Node{
+					Operation: OperationAdd,
+					Left:      a,
+					Right:     convert(node),
+				}
+			case ruleminus:
+				node = node.next
+				a = &Node{
+					Operation: OperationSubtract,
+					Left:      a,
+					Right:     convert(node),
+				}
+			case rulemultiply:
+				node = node.next
+				a = &Node{
+					Operation: OperationMultiply,
+					Left:      a,
+					Right:     convert(node),
+				}
+			case ruledivide:
+				node = node.next
+				a = &Node{
+					Operation: OperationDivide,
+					Left:      a,
+					Right:     convert(node),
+				}
+			case rulemodulus:
+				node = node.next
+				a = &Node{
+					Operation: OperationModulus,
+					Left:      a,
+					Right:     convert(node),
+				}
+			case rulee4:
+				a = convertValue(node)
+			case ruleexponentiation:
+				node = node.next
+				a = &Node{
+					Operation: OperationExponentiation,
+					Left:      a,
+					Right:     convertValue(node),
+				}
+			}
+			node = node.next
+		}
+		return a
+	}
+	convert(node)
+	return nil
+}
+
+// Rulesub computes the subexpression
 func (c *Calculator) Rulesub(node *node32) *complex.Matrix {
 	node = node.up
 	for node != nil {

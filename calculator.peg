@@ -26,19 +26,23 @@ value <- matrix
        / exp2
        / pi
        / prec
+       / derivative
        / log
        / sqrt
        / cos
        / sin
        / tan
+       / variable
        / sub
-matrix <- '[' sp (e1 / row)+ ']' sp 
+variable <- [A-Za-z]+ sp
+matrix <- '[' sp (e1 / row)+ ']' sp
 imaginary <- < [-]? [0-9]+ ([.] [0-9]*)? > 'i' sp
 number <- < [-]? [0-9]+ ([.] [0-9]*)? > sp
 exp1 <- 'exp' open e1 close
 exp2 <- 'e^' value
 pi <- 'pi' sp
 prec <- 'prec' open e1 close
+derivative <- 'derivative' open e1 close
 log <- 'log' open e1 close
 sqrt <- 'sqrt' open e1 close
 cos <- 'cos' open e1 close
