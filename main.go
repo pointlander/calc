@@ -12,6 +12,15 @@ import (
 
 func completer(d prompt.Document) []prompt.Suggest {
 	s := []prompt.Suggest{
+		{Text: "exp", Description: "The natural number raised to a value"},
+		{Text: "pi", Description: "The constant PI"},
+		{Text: "prec", Description: "Sets the precision for calculations"},
+		{Text: "derivative", Description: "Computes the symbolic derivative of the expression"},
+		{Text: "log", Description: "The natural logarithm of the input"},
+		{Text: "sqrt", Description: "The square root of the value"},
+		{Text: "cos", Description: "The cosine of the value"},
+		{Text: "sin", Description: "The sine of the value"},
+		{Text: "tan", Description: "The tangent of the value"},
 		{Text: "exit", Description: "Exit the application"},
 	}
 	return prompt.FilterHasPrefix(s, d.GetWordBeforeCursor(), true)
