@@ -449,7 +449,7 @@ func (c *Calculator) Rulederivative(node *node32) *complex.Matrix {
 		}
 		return a
 	}
-	fmt.Println(convert(node).String())
+	fmt.Println(convert(node).Derivative().String())
 	return nil
 }
 
