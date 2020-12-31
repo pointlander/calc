@@ -40,6 +40,10 @@ func main() {
 			continue
 		}
 		result := calc.Eval()
-		fmt.Printf("%s\n", result.String())
+		if result.Matrix != nil {
+			fmt.Printf("%s\n", result.Matrix.String())
+		} else {
+			fmt.Printf("%s\n", result.Expression.String())
+		}
 	}
 }

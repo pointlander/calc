@@ -5,7 +5,6 @@
 package main
 
 import (
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -15,13 +14,19 @@ import (
 
 var prec uint = 1024
 
+// Value is a value
+type Value struct {
+	Matrix     *complex.Matrix
+	Expression *Node
+}
+
 // Eval evaluates the expression
-func (c *Calculator) Eval() *complex.Matrix {
+func (c *Calculator) Eval() Value {
 	return c.Rulee(c.AST())
 }
 
 // Rulee is a root expresion
-func (c *Calculator) Rulee(node *node32) *complex.Matrix {
+func (c *Calculator) Rulee(node *node32) Value {
 	node = node.up
 	for node != nil {
 		switch node.pegRule {
@@ -30,13 +35,13 @@ func (c *Calculator) Rulee(node *node32) *complex.Matrix {
 		}
 		node = node.next
 	}
-	return nil
+	return Value{}
 }
 
 // Rulee1 deals with addation or subtraction
-func (c *Calculator) Rulee1(node *node32) *complex.Matrix {
+func (c *Calculator) Rulee1(node *node32) Value {
 	node = node.up
-	var a *complex.Matrix
+	var a Value
 	for node != nil {
 		switch node.pegRule {
 		case rulee2:
@@ -44,11 +49,11 @@ func (c *Calculator) Rulee1(node *node32) *complex.Matrix {
 		case ruleadd:
 			node = node.next
 			b := c.Rulee2(node)
-			a.Add(a, b)
+			a.Matrix.Add(a.Matrix, b.Matrix)
 		case ruleminus:
 			node = node.next
 			b := c.Rulee2(node)
-			a.Sub(a, b)
+			a.Matrix.Sub(a.Matrix, b.Matrix)
 		}
 		node = node.next
 	}
@@ -56,9 +61,9 @@ func (c *Calculator) Rulee1(node *node32) *complex.Matrix {
 }
 
 // Rulee2 deals with multiplication, division, or modulus
-func (c *Calculator) Rulee2(node *node32) *complex.Matrix {
+func (c *Calculator) Rulee2(node *node32) Value {
 	node = node.up
-	var a *complex.Matrix
+	var a Value
 	for node != nil {
 		switch node.pegRule {
 		case rulee3:
@@ -66,16 +71,16 @@ func (c *Calculator) Rulee2(node *node32) *complex.Matrix {
 		case rulemultiply:
 			node = node.next
 			b := c.Rulee3(node)
-			a.Mul(a, b)
+			a.Matrix.Mul(a.Matrix, b.Matrix)
 		case ruledivide:
 			node = node.next
 			b := c.Rulee3(node)
-			a.Div(a, b)
+			a.Matrix.Div(a.Matrix, b.Matrix)
 		case rulemodulus:
 			node = node.next
 			b := c.Rulee3(node)
-			if a.Values[0][0].A.Denom().Cmp(big.NewInt(1)) == 0 && b.Values[0][0].A.Denom().Cmp(big.NewInt(1)) == 0 {
-				a.Values[0][0].A.Num().Mod(a.Values[0][0].A.Num(), b.Values[0][0].A.Num())
+			if a.Matrix.Values[0][0].A.Denom().Cmp(big.NewInt(1)) == 0 && b.Matrix.Values[0][0].A.Denom().Cmp(big.NewInt(1)) == 0 {
+				a.Matrix.Values[0][0].A.Num().Mod(a.Matrix.Values[0][0].A.Num(), b.Matrix.Values[0][0].A.Num())
 			}
 		}
 		node = node.next
@@ -84,9 +89,9 @@ func (c *Calculator) Rulee2(node *node32) *complex.Matrix {
 }
 
 // Rulee3 deals with exponentiation
-func (c *Calculator) Rulee3(node *node32) *complex.Matrix {
+func (c *Calculator) Rulee3(node *node32) Value {
 	node = node.up
-	var a *complex.Matrix
+	var a Value
 	for node != nil {
 		switch node.pegRule {
 		case rulee4:
@@ -94,7 +99,7 @@ func (c *Calculator) Rulee3(node *node32) *complex.Matrix {
 		case ruleexponentiation:
 			node = node.next
 			b := c.Rulee4(node)
-			a.Pow(a, &b.Values[0][0])
+			a.Matrix.Pow(a.Matrix, &b.Matrix.Values[0][0])
 		}
 		node = node.next
 	}
@@ -102,7 +107,7 @@ func (c *Calculator) Rulee3(node *node32) *complex.Matrix {
 }
 
 // Rulee4 negates a number
-func (c *Calculator) Rulee4(node *node32) *complex.Matrix {
+func (c *Calculator) Rulee4(node *node32) Value {
 	node = node.up
 	minus := false
 	for node != nil {
@@ -110,7 +115,7 @@ func (c *Calculator) Rulee4(node *node32) *complex.Matrix {
 		case rulevalue:
 			a := c.Rulevalue(node)
 			if minus {
-				a.Neg(a)
+				a.Matrix.Neg(a.Matrix)
 			}
 			return a
 		case ruleminus:
@@ -118,11 +123,11 @@ func (c *Calculator) Rulee4(node *node32) *complex.Matrix {
 		}
 		node = node.next
 	}
-	return nil
+	return Value{}
 }
 
 // Rulevalue evaluates the value
-func (c *Calculator) Rulevalue(node *node32) *complex.Matrix {
+func (c *Calculator) Rulevalue(node *node32) Value {
 	node = node.up
 	for node != nil {
 		switch node.pegRule {
@@ -133,19 +138,19 @@ func (c *Calculator) Rulevalue(node *node32) *complex.Matrix {
 			a.B.SetString(strings.TrimSpace(string(c.buffer[node.begin:node.end])))
 			b := complex.NewMatrix(prec)
 			b.Values = [][]complex.Rational{[]complex.Rational{*a}}
-			return &b
+			return Value{Matrix: &b}
 		case rulenumber:
 			a := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
 			a.A.SetString(strings.TrimSpace(string(c.buffer[node.begin:node.end])))
 			b := complex.NewMatrix(prec)
 			b.Values = [][]complex.Rational{[]complex.Rational{*a}}
-			return &b
+			return Value{Matrix: &b}
 		case ruleexp1:
 			node := node.up
 			for node != nil {
 				if node.pegRule == rulee1 {
 					a := c.Rulee1(node)
-					a.Exp(a)
+					a.Matrix.Exp(a.Matrix)
 					return a
 				}
 				node = node.next
@@ -155,7 +160,7 @@ func (c *Calculator) Rulevalue(node *node32) *complex.Matrix {
 			for node != nil {
 				if node.pegRule == rulevalue {
 					a := c.Rulevalue(node)
-					a.Exp(a)
+					a.Matrix.Exp(a.Matrix)
 					return a
 				}
 				node = node.next
@@ -166,13 +171,13 @@ func (c *Calculator) Rulevalue(node *node32) *complex.Matrix {
 			b := complex.NewRational(a, big.NewRat(0, 1))
 			c := complex.NewMatrix(prec)
 			c.Values = [][]complex.Rational{[]complex.Rational{*b}}
-			return &c
+			return Value{Matrix: &c}
 		case ruleprec:
 			node := node.up
 			for node != nil {
 				if node.pegRule == rulee1 {
 					a := c.Rulee1(node)
-					prec = uint(a.Values[0][0].A.Num().Uint64())
+					prec = uint(a.Matrix.Values[0][0].A.Num().Uint64())
 					return a
 				}
 				node = node.next
@@ -181,8 +186,7 @@ func (c *Calculator) Rulevalue(node *node32) *complex.Matrix {
 			node := node.up
 			for node != nil {
 				if node.pegRule == rulee1 {
-					c.Rulederivative(node)
-					return &complex.Matrix{}
+					return c.Rulederivative(node)
 				}
 				node = node.next
 			}
@@ -191,7 +195,7 @@ func (c *Calculator) Rulevalue(node *node32) *complex.Matrix {
 			for node != nil {
 				if node.pegRule == rulee1 {
 					a := c.Rulee1(node)
-					a.Log(a)
+					a.Matrix.Log(a.Matrix)
 					return a
 				}
 				node = node.next
@@ -201,7 +205,7 @@ func (c *Calculator) Rulevalue(node *node32) *complex.Matrix {
 			for node != nil {
 				if node.pegRule == rulee1 {
 					a := c.Rulee1(node)
-					a.Sqrt(a)
+					a.Matrix.Sqrt(a.Matrix)
 					return a
 				}
 				node = node.next
@@ -211,7 +215,7 @@ func (c *Calculator) Rulevalue(node *node32) *complex.Matrix {
 			for node != nil {
 				if node.pegRule == rulee1 {
 					a := c.Rulee1(node)
-					a.Cos(a)
+					a.Matrix.Cos(a.Matrix)
 					return a
 				}
 				node = node.next
@@ -221,7 +225,7 @@ func (c *Calculator) Rulevalue(node *node32) *complex.Matrix {
 			for node != nil {
 				if node.pegRule == rulee1 {
 					a := c.Rulee1(node)
-					a.Sin(a)
+					a.Matrix.Sin(a.Matrix)
 					return a
 				}
 				node = node.next
@@ -231,7 +235,7 @@ func (c *Calculator) Rulevalue(node *node32) *complex.Matrix {
 			for node != nil {
 				if node.pegRule == rulee1 {
 					a := c.Rulee1(node)
-					a.Tan(a)
+					a.Matrix.Tan(a.Matrix)
 					return a
 				}
 				node = node.next
@@ -241,11 +245,11 @@ func (c *Calculator) Rulevalue(node *node32) *complex.Matrix {
 		}
 		node = node.next
 	}
-	return nil
+	return Value{}
 }
 
 // Rulematrix computes the matrix
-func (c *Calculator) Rulematrix(node *node32) *complex.Matrix {
+func (c *Calculator) Rulematrix(node *node32) Value {
 	node = node.up
 	x := complex.NewMatrix(prec)
 	x.Values = make([][]complex.Rational, 1)
@@ -253,8 +257,8 @@ func (c *Calculator) Rulematrix(node *node32) *complex.Matrix {
 		switch node.pegRule {
 		case rulee1:
 			a, end := c.Rulee1(node), len(x.Values)-1
-			if len(a.Values) == 1 && len(a.Values[0]) == 1 {
-				x.Values[end] = append(x.Values[end], a.Values[0][0])
+			if len(a.Matrix.Values) == 1 && len(a.Matrix.Values[0]) == 1 {
+				x.Values[end] = append(x.Values[end], a.Matrix.Values[0][0])
 				break
 			}
 			panic("matrix within matrix not allowed")
@@ -263,11 +267,11 @@ func (c *Calculator) Rulematrix(node *node32) *complex.Matrix {
 		}
 		node = node.next
 	}
-	return &x
+	return Value{Matrix: &x}
 }
 
 // Rulederivative computes the symbolic derivative of a number
-func (c *Calculator) Rulederivative(node *node32) *complex.Matrix {
+func (c *Calculator) Rulederivative(node *node32) Value {
 	var (
 		convert      func(node *node32) (a *Node)
 		convertValue func(node *node32) (a *Node)
@@ -449,12 +453,11 @@ func (c *Calculator) Rulederivative(node *node32) *complex.Matrix {
 		}
 		return a
 	}
-	fmt.Println(convert(node).Derivative().String())
-	return nil
+	return Value{Expression: convert(node).Derivative()}
 }
 
 // Rulesub computes the subexpression
-func (c *Calculator) Rulesub(node *node32) *complex.Matrix {
+func (c *Calculator) Rulesub(node *node32) Value {
 	node = node.up
 	for node != nil {
 		switch node.pegRule {
@@ -463,5 +466,5 @@ func (c *Calculator) Rulesub(node *node32) *complex.Matrix {
 		}
 		node = node.next
 	}
-	return nil
+	return Value{}
 }
