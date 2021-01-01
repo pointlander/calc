@@ -453,7 +453,11 @@ func (c *Calculator) Rulederivative(node *node32) Value {
 		}
 		return a
 	}
-	return Value{Expression: convert(node).Derivative()}
+	derivative := convert(node).Derivative()
+	if derivative != nil {
+		derivative = derivative.Simplify()
+	}
+	return Value{Expression: derivative}
 }
 
 // Rulesub computes the subexpression

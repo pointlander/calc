@@ -57,6 +57,13 @@ type Node struct {
 	Left, Right *Node
 }
 
+// Equals test if value is equal to x
+func (n *Node) Equals(x int64) bool {
+	value := big.NewInt(0)
+	value.SetString(n.Value, 10)
+	return value.Cmp(big.NewInt(x)) == 0
+}
+
 // String returns the string form of the equation
 func (n *Node) String() string {
 	var process func(n *Node) string
@@ -310,6 +317,234 @@ func (n *Node) Derivative() *Node {
 				Operation: OperationMultiply,
 				Left:      add,
 				Right:     process(n.Left),
+			}
+			return a
+		}
+		return nil
+	}
+	return process(n)
+}
+
+// Simplify simplifies an expression
+func (n *Node) Simplify() *Node {
+	var process func(n *Node) *Node
+	process = func(n *Node) *Node {
+		if n == nil {
+			return nil
+		}
+		switch n.Operation {
+		case OperationNoop:
+			return n
+		case OperationAdd:
+			if (n.Left.Operation == OperationNumber || n.Left.Operation == OperationImaginary) &&
+				n.Left.Equals(0) {
+				return process(n.Right)
+			} else if (n.Right.Operation == OperationNumber || n.Right.Operation == OperationImaginary) &&
+				n.Right.Equals(0) {
+				return process(n.Left)
+			}
+			a := &Node{
+				Operation: OperationAdd,
+				Left:      process(n.Left),
+				Right:     process(n.Right),
+			}
+			return a
+		case OperationSubtract:
+			if (n.Left.Operation == OperationNumber || n.Left.Operation == OperationImaginary) &&
+				n.Left.Equals(0) {
+				a := &Node{
+					Operation: OperationNegate,
+					Left:      process(n.Right),
+				}
+				return a
+			} else if (n.Right.Operation == OperationNumber || n.Right.Operation == OperationImaginary) &&
+				n.Right.Equals(0) {
+				return process(n.Left)
+			}
+			a := &Node{
+				Operation: OperationSubtract,
+				Left:      process(n.Left),
+				Right:     process(n.Right),
+			}
+			return a
+		case OperationMultiply:
+			if (n.Left.Operation == OperationNumber || n.Left.Operation == OperationImaginary) &&
+				n.Left.Equals(0) {
+				a := &Node{
+					Operation: OperationNumber,
+					Value:     "0",
+				}
+				return a
+			} else if (n.Right.Operation == OperationNumber || n.Right.Operation == OperationImaginary) &&
+				n.Right.Equals(0) {
+				a := &Node{
+					Operation: OperationNumber,
+					Value:     "0",
+				}
+				return a
+			} else if (n.Left.Operation == OperationNumber || n.Left.Operation == OperationImaginary) &&
+				n.Left.Equals(1) {
+				return process(n.Right)
+			} else if (n.Right.Operation == OperationNumber || n.Right.Operation == OperationImaginary) &&
+				n.Right.Equals(1) {
+				return process(n.Left)
+			}
+			a := &Node{
+				Operation: OperationMultiply,
+				Left:      process(n.Left),
+				Right:     process(n.Right),
+			}
+			return a
+		case OperationDivide:
+			if (n.Left.Operation == OperationNumber || n.Left.Operation == OperationImaginary) &&
+				n.Left.Equals(0) {
+				a := &Node{
+					Operation: OperationNumber,
+					Value:     "0",
+				}
+				return a
+			} else if (n.Right.Operation == OperationNumber || n.Right.Operation == OperationImaginary) &&
+				n.Right.Equals(0) {
+				a := &Node{
+					Operation: OperationNumber,
+					Value:     "+Inf",
+				}
+				return a
+			} else if (n.Right.Operation == OperationNumber || n.Right.Operation == OperationImaginary) &&
+				n.Right.Equals(1) {
+				return process(n.Left)
+			}
+			a := &Node{
+				Operation: OperationDivide,
+				Left:      process(n.Left),
+				Right:     process(n.Right),
+			}
+			return a
+		case OperationModulus:
+			if (n.Right.Operation == OperationNumber || n.Right.Operation == OperationImaginary) &&
+				n.Right.Equals(1) {
+				return process(n.Left)
+			}
+			a := &Node{
+				Operation: OperationModulus,
+				Left:      process(n.Left),
+				Right:     process(n.Right),
+			}
+			return a
+		case OperationExponentiation:
+			if (n.Left.Operation == OperationNumber || n.Left.Operation == OperationImaginary) &&
+				n.Left.Equals(0) {
+				a := &Node{
+					Operation: OperationNumber,
+					Value:     "0",
+				}
+				return a
+			} else if (n.Right.Operation == OperationNumber || n.Right.Operation == OperationImaginary) &&
+				n.Right.Equals(0) {
+				a := &Node{
+					Operation: OperationNumber,
+					Value:     "1",
+				}
+				return a
+			} else if (n.Left.Operation == OperationNumber || n.Left.Operation == OperationImaginary) &&
+				n.Left.Equals(1) {
+				a := &Node{
+					Operation: OperationNumber,
+					Value:     "1",
+				}
+				return a
+			} else if (n.Right.Operation == OperationNumber || n.Right.Operation == OperationImaginary) &&
+				n.Right.Equals(1) {
+				return process(n.Left)
+			}
+			a := &Node{
+				Operation: OperationExponentiation,
+				Left:      process(n.Left),
+				Right:     process(n.Right),
+			}
+			return a
+		case OperationNegate:
+			if (n.Left.Operation == OperationNumber || n.Left.Operation == OperationImaginary) &&
+				n.Left.Equals(0) {
+				a := &Node{
+					Operation: OperationNumber,
+					Value:     "0",
+				}
+				return a
+			}
+			a := &Node{
+				Operation: OperationNegate,
+				Left:      process(n.Left),
+			}
+			return a
+		case OperationVariable:
+			return n
+		case OperationImaginary:
+			return n
+		case OperationNumber:
+			return n
+		case OperationNaturalExponentiation:
+			if (n.Left.Operation == OperationNumber || n.Left.Operation == OperationImaginary) &&
+				n.Left.Equals(0) {
+				a := &Node{
+					Operation: OperationNumber,
+					Value:     "1",
+				}
+				return a
+			} else if (n.Left.Operation == OperationNumber || n.Left.Operation == OperationImaginary) &&
+				n.Left.Equals(1) {
+				a := &Node{
+					Operation: OperationVariable,
+					Value:     "e",
+				}
+				return a
+			}
+			a := &Node{
+				Operation: OperationNaturalExponentiation,
+				Left:      process(n.Left),
+			}
+			return a
+		case OperationPI:
+			return n
+		case OperationNaturalLogarithm:
+			a := &Node{
+				Operation: OperationNaturalLogarithm,
+				Left:      process(n.Left),
+			}
+			return a
+		case OperationSquareRoot:
+			if (n.Left.Operation == OperationNumber || n.Left.Operation == OperationImaginary) &&
+				n.Left.Equals(0) {
+				a := &Node{
+					Operation: OperationNumber,
+					Value:     "0",
+				}
+				return a
+			} else if (n.Left.Operation == OperationNumber || n.Left.Operation == OperationImaginary) &&
+				n.Left.Equals(1) {
+				a := &Node{
+					Operation: OperationNumber,
+					Value:     "1",
+				}
+				return a
+			}
+			return n
+		case OperationCosine:
+			a := &Node{
+				Operation: OperationCosine,
+				Left:      process(n.Left),
+			}
+			return a
+		case OperationSine:
+			a := &Node{
+				Operation: OperationSine,
+				Left:      process(n.Left),
+			}
+			return a
+		case OperationTangent:
+			a := &Node{
+				Operation: OperationTangent,
+				Left:      process(n.Left),
 			}
 			return a
 		}
