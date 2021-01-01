@@ -13,6 +13,7 @@ import (
 func completer(d prompt.Document) []prompt.Suggest {
 	s := []prompt.Suggest{
 		{Text: "exp", Description: "The natural number raised to a value"},
+		{Text: "e", Description: "The natural number"},
 		{Text: "pi", Description: "The constant PI"},
 		{Text: "prec", Description: "Sets the precision for calculations"},
 		{Text: "derivative", Description: "Computes the symbolic derivative of the expression"},

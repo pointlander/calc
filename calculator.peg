@@ -24,6 +24,7 @@ value <- matrix
        / number
        / exp1
        / exp2
+       / natural
        / pi
        / prec
        / derivative
@@ -40,6 +41,7 @@ imaginary <- < [-]? [0-9]+ ([.] [0-9]*)? > 'i' sp
 number <- < [-]? [0-9]+ ([.] [0-9]*)? > sp
 exp1 <- 'exp' open e1 close
 exp2 <- 'e^' value
+natural <- 'e' sp
 pi <- 'pi' sp
 prec <- 'prec' open e1 close
 derivative <- 'derivative' open e1 close

@@ -36,6 +36,8 @@ const (
 	OperationNumber
 	// OperationNaturalExponentiation raises the natural number to a power
 	OperationNaturalExponentiation
+	// OperationNatural is the constant e
+	OperationNatural
 	// OperationPI is the constant pi
 	OperationPI
 	// OperationNaturalLogarithm os the natural logarithm
@@ -96,8 +98,10 @@ func (n *Node) String() string {
 			return n.Value
 		case OperationNaturalExponentiation:
 			return "(e^" + process(n.Left) + ")"
+		case OperationNatural:
+			return "e"
 		case OperationPI:
-			return "PI"
+			return "pi"
 		case OperationNaturalLogarithm:
 			return "log(" + process(n.Left) + ")"
 		case OperationSquareRoot:
@@ -237,6 +241,12 @@ func (n *Node) Derivative() *Node {
 				Operation: OperationMultiply,
 				Left:      n,
 				Right:     process(n.Left),
+			}
+			return a
+		case OperationNatural:
+			a := &Node{
+				Operation: OperationNumber,
+				Value:     "0",
 			}
 			return a
 		case OperationPI:
@@ -512,12 +522,18 @@ func (n *Node) Simplify() *Node {
 				Left:      left,
 			}
 			return a
+		case OperationNatural:
+			return n
 		case OperationPI:
 			return n
 		case OperationNaturalLogarithm:
+			left := process(n.Left)
+			if left.Operation == OperationNatural {
+				return left
+			}
 			a := &Node{
 				Operation: OperationNaturalLogarithm,
-				Left:      process(n.Left),
+				Left:      left,
 			}
 			return a
 		case OperationSquareRoot:

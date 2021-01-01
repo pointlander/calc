@@ -165,6 +165,11 @@ func (c *Calculator) Rulevalue(node *node32) Value {
 				}
 				node = node.next
 			}
+		case rulenatural:
+			a := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
+			b := complex.NewMatrix(prec)
+			b.Values = [][]complex.Rational{[]complex.Rational{*a}}
+			return Value{Matrix: b.Exp(&b)}
 		case rulepi:
 			a := big.NewRat(1, 1)
 			bigfloat.PI(prec).Rat(a)
@@ -326,6 +331,11 @@ func (c *Calculator) Rulederivative(node *node32) Value {
 					}
 					node = node.next
 				}
+			case rulenatural:
+				a = &Node{
+					Operation: OperationNatural,
+				}
+				return a
 			case rulepi:
 				a = &Node{
 					Operation: OperationPI,
