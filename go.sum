@@ -33,6 +33,8 @@ github.com/pointlander/c0mpl3x v0.0.0-20201228183929-eaf1a0ea3409 h1:6Ky6HMFIcOW
 github.com/pointlander/c0mpl3x v0.0.0-20201228183929-eaf1a0ea3409/go.mod h1:Ou+gTDOjSDEOqW6i1ntvzbh44CoOuT25T+bUzejr06Y=
 github.com/pointlander/c0mpl3x v0.0.0-20210103054504-d33bd969b97b h1:wV0aq3HcHMBEnKxbDA6PNCpf5yFFVt2z+HQazEWNzac=
 github.com/pointlander/c0mpl3x v0.0.0-20210103054504-d33bd969b97b/go.mod h1:mp6FLmFsHG+AsxELsxC80FbIMbz59TGP79mnjBmTYIw=
+github.com/pointlander/c0mpl3x v0.0.0-20210103054932-b204c9ab06b0 h1:4Qazv5vEdFn8JM7K0BRbTfwmN2da6/0CpL5OCzBcwf4=
+github.com/pointlander/c0mpl3x v0.0.0-20210103054932-b204c9ab06b0/go.mod h1:kYSSqyTxdrQo1PrmK0pr9VAypgsXYMGy8K0bK8wSxeU=
 golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sys v0.0.0-20190222072716-a9d3bda3a223/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
 golang.org/x/sys v0.0.0-20191008105621-543471e840be/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
