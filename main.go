@@ -16,6 +16,7 @@ func completer(d prompt.Document) []prompt.Suggest {
 		{Text: "e", Description: "The natural number"},
 		{Text: "pi", Description: "The constant PI"},
 		{Text: "prec", Description: "Sets the precision for calculations"},
+		{Text: "simplify", Description: "Simplifies the expression"},
 		{Text: "derivative", Description: "Computes the symbolic derivative of the expression"},
 		{Text: "log", Description: "The natural logarithm of the input"},
 		{Text: "sqrt", Description: "The square root of the value"},

@@ -187,6 +187,14 @@ func (c *Calculator) Rulevalue(node *node32) Value {
 				}
 				node = node.next
 			}
+		case rulesimplify:
+			node := node.up
+			for node != nil {
+				if node.pegRule == rulee1 {
+					return c.Rulesimplify(node)
+				}
+				node = node.next
+			}
 		case rulederivative:
 			node := node.up
 			for node != nil {
@@ -275,8 +283,8 @@ func (c *Calculator) Rulematrix(node *node32) Value {
 	return Value{Matrix: &x}
 }
 
-// Rulederivative computes the symbolic derivative of a number
-func (c *Calculator) Rulederivative(node *node32) Value {
+// Convert converts to an expression
+func (c *Calculator) Convert(node *node32) Value {
 	var (
 		convert      func(node *node32) (a *Node)
 		convertValue func(node *node32) (a *Node)
@@ -463,7 +471,22 @@ func (c *Calculator) Rulederivative(node *node32) Value {
 		}
 		return a
 	}
-	derivative := convert(node).Derivative()
+	return Value{Expression: convert(node)}
+}
+
+// Rulesimplify simplifies the expression
+func (c *Calculator) Rulesimplify(node *node32) Value {
+	expression := c.Convert(node).Expression
+	if expression != nil {
+		expression = expression.Simplify()
+	}
+	return Value{Expression: expression}
+}
+
+// Rulederivative computes the symbolic derivative of a number
+func (c *Calculator) Rulederivative(node *node32) Value {
+	expression := c.Convert(node).Expression
+	derivative := expression.Derivative()
 	if derivative != nil {
 		derivative = derivative.Simplify()
 	}
