@@ -14,8 +14,19 @@ import (
 
 var prec uint = 1024
 
+// ValueType is a value type
+type ValueType int
+
+const (
+	// ValueTypeMatrix is a matrix value type
+	ValueTypeMatrix ValueType = iota
+	// ValueTypeExpression is an expression value type
+	ValueTypeExpression
+)
+
 // Value is a value
 type Value struct {
+	ValueType  ValueType
 	Matrix     *complex.Matrix
 	Expression *Node
 }
@@ -138,13 +149,19 @@ func (c *Calculator) Rulevalue(node *node32) Value {
 			a.B.SetString(strings.TrimSpace(string(c.buffer[node.begin:node.end])))
 			b := complex.NewMatrix(prec)
 			b.Values = [][]complex.Rational{[]complex.Rational{*a}}
-			return Value{Matrix: &b}
+			return Value{
+				ValueType: ValueTypeMatrix,
+				Matrix:    &b,
+			}
 		case rulenumber:
 			a := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
 			a.A.SetString(strings.TrimSpace(string(c.buffer[node.begin:node.end])))
 			b := complex.NewMatrix(prec)
 			b.Values = [][]complex.Rational{[]complex.Rational{*a}}
-			return Value{Matrix: &b}
+			return Value{
+				ValueType: ValueTypeMatrix,
+				Matrix:    &b,
+			}
 		case ruleexp1:
 			node := node.up
 			for node != nil {
@@ -169,14 +186,20 @@ func (c *Calculator) Rulevalue(node *node32) Value {
 			a := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
 			b := complex.NewMatrix(prec)
 			b.Values = [][]complex.Rational{[]complex.Rational{*a}}
-			return Value{Matrix: b.Exp(&b)}
+			return Value{
+				ValueType: ValueTypeMatrix,
+				Matrix:    b.Exp(&b),
+			}
 		case rulepi:
 			a := big.NewRat(1, 1)
 			bigfloat.PI(prec).Rat(a)
 			b := complex.NewRational(a, big.NewRat(0, 1))
 			c := complex.NewMatrix(prec)
 			c.Values = [][]complex.Rational{[]complex.Rational{*b}}
-			return Value{Matrix: &c}
+			return Value{
+				ValueType: ValueTypeMatrix,
+				Matrix:    &c,
+			}
 		case ruleprec:
 			node := node.up
 			for node != nil {
@@ -280,7 +303,10 @@ func (c *Calculator) Rulematrix(node *node32) Value {
 		}
 		node = node.next
 	}
-	return Value{Matrix: &x}
+	return Value{
+		ValueType: ValueTypeMatrix,
+		Matrix:    &x,
+	}
 }
 
 // Convert converts to an expression
@@ -471,7 +497,10 @@ func (c *Calculator) Convert(node *node32) Value {
 		}
 		return a
 	}
-	return Value{Expression: convert(node)}
+	return Value{
+		ValueType:  ValueTypeExpression,
+		Expression: convert(node),
+	}
 }
 
 // Rulesimplify simplifies the expression
@@ -480,7 +509,10 @@ func (c *Calculator) Rulesimplify(node *node32) Value {
 	if expression != nil {
 		expression = expression.Simplify()
 	}
-	return Value{Expression: expression}
+	return Value{
+		ValueType:  ValueTypeExpression,
+		Expression: expression,
+	}
 }
 
 // Rulederivative computes the symbolic derivative of a number
@@ -490,7 +522,10 @@ func (c *Calculator) Rulederivative(node *node32) Value {
 	if derivative != nil {
 		derivative = derivative.Simplify()
 	}
-	return Value{Expression: derivative}
+	return Value{
+		ValueType:  ValueTypeExpression,
+		Expression: derivative,
+	}
 }
 
 // Rulesub computes the subexpression
