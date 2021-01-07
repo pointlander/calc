@@ -8,6 +8,8 @@ import (
 	"fmt"
 
 	"github.com/c-bata/go-prompt"
+
+	"github.com/pointlander/calc"
 )
 
 func completer(d prompt.Document) []prompt.Suggest {
@@ -35,13 +37,13 @@ func main() {
 			return
 		}
 
-		calc := &Calculator{Buffer: value}
-		calc.Init()
-		if err := calc.Parse(); err != nil {
+		cal := &calc.Calculator{Buffer: value}
+		cal.Init()
+		if err := cal.Parse(); err != nil {
 			fmt.Println(err)
 			continue
 		}
-		result := calc.Eval()
+		result := cal.Eval()
 		if result.Matrix != nil {
 			fmt.Printf("%s\n", result.Matrix.String())
 		} else {
