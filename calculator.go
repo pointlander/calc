@@ -145,8 +145,27 @@ func (c *Calculator) Rulevalue(node *node32) Value {
 		case rulematrix:
 			return c.Rulematrix(node)
 		case ruleimaginary:
-			a := complex.NewRational(big.NewRat(0, 1), big.NewRat(1, 1))
-			a.B.SetString(strings.TrimSpace(string(c.buffer[node.begin:node.end])))
+			a := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
+			node := node.up
+			for node != nil {
+				switch node.pegRule {
+				case ruledecimal:
+					a.A.SetString(strings.TrimSpace(string(c.buffer[node.begin:node.end])))
+				case rulenotation:
+					b := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
+					b.A.SetString(strings.TrimSpace(string(c.buffer[node.up.begin:node.up.end])))
+					c := complex.NewRational(big.NewRat(10, 1), big.NewRat(0, 1))
+					x := complex.NewFloat(big.NewFloat(0).SetPrec(prec), big.NewFloat(0).SetPrec(prec))
+					x.SetRat(c)
+					y := complex.NewFloat(big.NewFloat(0).SetPrec(prec), big.NewFloat(0).SetPrec(prec))
+					y.SetRat(b)
+					x.Pow(x, y).Rat(b)
+					a.Mul(a, b)
+				}
+				node = node.next
+			}
+
+			a.A, a.B = a.B, a.A
 			b := complex.NewMatrix(prec)
 			b.Values = [][]complex.Rational{[]complex.Rational{*a}}
 			return Value{
@@ -155,7 +174,25 @@ func (c *Calculator) Rulevalue(node *node32) Value {
 			}
 		case rulenumber:
 			a := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
-			a.A.SetString(strings.TrimSpace(string(c.buffer[node.begin:node.end])))
+			node := node.up
+			for node != nil {
+				switch node.pegRule {
+				case ruledecimal:
+					a.A.SetString(strings.TrimSpace(string(c.buffer[node.begin:node.end])))
+				case rulenotation:
+					b := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
+					b.A.SetString(strings.TrimSpace(string(c.buffer[node.up.begin:node.up.end])))
+					c := complex.NewRational(big.NewRat(10, 1), big.NewRat(0, 1))
+					x := complex.NewFloat(big.NewFloat(0).SetPrec(prec), big.NewFloat(0).SetPrec(prec))
+					x.SetRat(c)
+					y := complex.NewFloat(big.NewFloat(0).SetPrec(prec), big.NewFloat(0).SetPrec(prec))
+					y.SetRat(b)
+					x.Pow(x, y).Rat(b)
+					a.Mul(a, b)
+				}
+				node = node.next
+			}
+
 			b := complex.NewMatrix(prec)
 			b.Values = [][]complex.Rational{[]complex.Rational{*a}}
 			return Value{
@@ -332,15 +369,53 @@ func (c *Calculator) Convert(node *node32) Value {
 					Value:     strings.TrimSpace(string(c.buffer[node.begin:node.end])),
 				}
 			case ruleimaginary:
+				node := node.up
 				a = &Node{
 					Operation: OperationImaginary,
-					Value:     strings.TrimSpace(string(c.buffer[node.begin:node.end])),
 				}
+				for node != nil {
+					switch node.pegRule {
+					case ruledecimal:
+						a.Value = strings.TrimSpace(string(c.buffer[node.begin:node.end]))
+					case rulenotation:
+						a.Left = &Node{
+							Operation: OperationImaginary,
+							Value:     a.Value,
+						}
+						a.Operation = OperationNotation
+						a.Value = ""
+						a.Right = &Node{
+							Operation: OperationNumber,
+							Value:     strings.TrimSpace(string(c.buffer[node.up.begin:node.up.end])),
+						}
+					}
+					node = node.next
+				}
+				return a
 			case rulenumber:
+				node := node.up
 				a = &Node{
 					Operation: OperationNumber,
-					Value:     strings.TrimSpace(string(c.buffer[node.begin:node.end])),
 				}
+				for node != nil {
+					switch node.pegRule {
+					case ruledecimal:
+						a.Value = strings.TrimSpace(string(c.buffer[node.begin:node.end]))
+					case rulenotation:
+						a.Left = &Node{
+							Operation: OperationNumber,
+							Value:     a.Value,
+						}
+						a.Operation = OperationNotation
+						a.Value = ""
+						a.Right = &Node{
+							Operation: OperationNumber,
+							Value:     strings.TrimSpace(string(c.buffer[node.up.begin:node.up.end])),
+						}
+					}
+					node = node.next
+				}
+				return a
 			case ruleexp1:
 				node := node.up
 				for node != nil {

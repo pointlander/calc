@@ -50,6 +50,8 @@ const (
 	OperationSine
 	// OperationTangent computes the tangent of a number
 	OperationTangent
+	// OperationNotation is E notation operation
+	OperationNotation
 )
 
 // Node is a node in an expression binary tree
@@ -61,6 +63,16 @@ type Node struct {
 
 // Equals test if value is equal to x
 func (n *Node) Equals(x int64) bool {
+	if n.Operation == OperationNotation {
+		a := big.NewInt(0)
+		a.SetString(n.Left.Value, 10)
+		b := big.NewInt(10)
+		c := big.NewInt(0)
+		c.SetString(n.Right.Value, 10)
+		b.Exp(b, c, nil)
+		a.Mul(a, b)
+		return a.Cmp(big.NewInt(x)) == 0
+	}
 	value := big.NewInt(0)
 	value.SetString(n.Value, 10)
 	return value.Cmp(big.NewInt(x)) == 0
@@ -96,6 +108,11 @@ func (n *Node) String() string {
 			return n.Value + "i"
 		case OperationNumber:
 			return n.Value
+		case OperationNotation:
+			if n.Left.Operation == OperationImaginary {
+				return n.Left.Value + "e" + process(n.Right) + "i"
+			}
+			return process(n.Left) + "e" + process(n.Right)
 		case OperationNaturalExponentiation:
 			return "(e^" + process(n.Left) + ")"
 		case OperationNatural:
@@ -236,6 +253,12 @@ func (n *Node) Derivative() *Node {
 				Value:     "0",
 			}
 			return a
+		case OperationNotation:
+			a := &Node{
+				Operation: OperationNumber,
+				Value:     "0",
+			}
+			return a
 		case OperationNaturalExponentiation:
 			a := &Node{
 				Operation: OperationMultiply,
@@ -335,6 +358,16 @@ func (n *Node) Derivative() *Node {
 	return process(n)
 }
 
+var numeric = map[Operation]bool{
+	OperationNumber:    true,
+	OperationImaginary: true,
+	OperationNotation:  true,
+}
+
+func isNumeric(operation Operation) bool {
+	return numeric[operation]
+}
+
 // Simplify simplifies an expression
 func (n *Node) Simplify() *Node {
 	var process func(n *Node) *Node
@@ -347,11 +380,9 @@ func (n *Node) Simplify() *Node {
 			return n
 		case OperationAdd:
 			left, right := process(n.Left), process(n.Right)
-			if (left.Operation == OperationNumber || left.Operation == OperationImaginary) &&
-				left.Equals(0) {
+			if isNumeric(left.Operation) && left.Equals(0) {
 				return right
-			} else if (right.Operation == OperationNumber || right.Operation == OperationImaginary) &&
-				n.Right.Equals(0) {
+			} else if isNumeric(right.Operation) && right.Equals(0) {
 				return left
 			}
 			a := &Node{
@@ -362,15 +393,13 @@ func (n *Node) Simplify() *Node {
 			return a
 		case OperationSubtract:
 			left, right := process(n.Left), process(n.Right)
-			if (left.Operation == OperationNumber || left.Operation == OperationImaginary) &&
-				left.Equals(0) {
+			if isNumeric(left.Operation) && left.Equals(0) {
 				a := &Node{
 					Operation: OperationNegate,
 					Left:      right,
 				}
 				return a
-			} else if (right.Operation == OperationNumber || right.Operation == OperationImaginary) &&
-				right.Equals(0) {
+			} else if isNumeric(right.Operation) && right.Equals(0) {
 				return left
 			}
 			a := &Node{
@@ -381,25 +410,21 @@ func (n *Node) Simplify() *Node {
 			return a
 		case OperationMultiply:
 			left, right := process(n.Left), process(n.Right)
-			if (left.Operation == OperationNumber || left.Operation == OperationImaginary) &&
-				left.Equals(0) {
+			if isNumeric(left.Operation) && left.Equals(0) {
 				a := &Node{
 					Operation: OperationNumber,
 					Value:     "0",
 				}
 				return a
-			} else if (right.Operation == OperationNumber || right.Operation == OperationImaginary) &&
-				right.Equals(0) {
+			} else if isNumeric(right.Operation) && right.Equals(0) {
 				a := &Node{
 					Operation: OperationNumber,
 					Value:     "0",
 				}
 				return a
-			} else if (left.Operation == OperationNumber || left.Operation == OperationImaginary) &&
-				left.Equals(1) {
+			} else if isNumeric(left.Operation) && left.Equals(1) {
 				return right
-			} else if (right.Operation == OperationNumber || right.Operation == OperationImaginary) &&
-				right.Equals(1) {
+			} else if isNumeric(right.Operation) && right.Equals(1) {
 				return left
 			}
 			a := &Node{
@@ -410,22 +435,19 @@ func (n *Node) Simplify() *Node {
 			return a
 		case OperationDivide:
 			left, right := process(n.Left), process(n.Right)
-			if (left.Operation == OperationNumber || left.Operation == OperationImaginary) &&
-				left.Equals(0) {
+			if isNumeric(left.Operation) && left.Equals(0) {
 				a := &Node{
 					Operation: OperationNumber,
 					Value:     "0",
 				}
 				return a
-			} else if (right.Operation == OperationNumber || right.Operation == OperationImaginary) &&
-				right.Equals(0) {
+			} else if isNumeric(right.Operation) && right.Equals(0) {
 				a := &Node{
 					Operation: OperationNumber,
 					Value:     "+Inf",
 				}
 				return a
-			} else if (right.Operation == OperationNumber || right.Operation == OperationImaginary) &&
-				right.Equals(1) {
+			} else if isNumeric(right.Operation) && right.Equals(1) {
 				return left
 			}
 			a := &Node{
@@ -436,8 +458,7 @@ func (n *Node) Simplify() *Node {
 			return a
 		case OperationModulus:
 			left, right := process(n.Left), process(n.Right)
-			if (right.Operation == OperationNumber || right.Operation == OperationImaginary) &&
-				right.Equals(1) {
+			if isNumeric(right.Operation) && right.Equals(1) {
 				return left
 			}
 			a := &Node{
@@ -448,29 +469,25 @@ func (n *Node) Simplify() *Node {
 			return a
 		case OperationExponentiation:
 			left, right := process(n.Left), process(n.Right)
-			if (left.Operation == OperationNumber || left.Operation == OperationImaginary) &&
-				left.Equals(0) {
+			if isNumeric(left.Operation) && left.Equals(0) {
 				a := &Node{
 					Operation: OperationNumber,
 					Value:     "0",
 				}
 				return a
-			} else if (right.Operation == OperationNumber || right.Operation == OperationImaginary) &&
-				right.Equals(0) {
+			} else if isNumeric(right.Operation) && right.Equals(0) {
 				a := &Node{
 					Operation: OperationNumber,
 					Value:     "1",
 				}
 				return a
-			} else if (left.Operation == OperationNumber || left.Operation == OperationImaginary) &&
-				left.Equals(1) {
+			} else if isNumeric(left.Operation) && left.Equals(1) {
 				a := &Node{
 					Operation: OperationNumber,
 					Value:     "1",
 				}
 				return a
-			} else if (right.Operation == OperationNumber || right.Operation == OperationImaginary) &&
-				right.Equals(1) {
+			} else if isNumeric(right.Operation) && right.Equals(1) {
 				return left
 			}
 			a := &Node{
@@ -481,8 +498,7 @@ func (n *Node) Simplify() *Node {
 			return a
 		case OperationNegate:
 			left := process(n.Left)
-			if (left.Operation == OperationNumber || left.Operation == OperationImaginary) &&
-				left.Equals(0) {
+			if isNumeric(left.Operation) && left.Equals(0) {
 				a := &Node{
 					Operation: OperationNumber,
 					Value:     "0",
@@ -500,17 +516,17 @@ func (n *Node) Simplify() *Node {
 			return n
 		case OperationNumber:
 			return n
+		case OperationNotation:
+			return n
 		case OperationNaturalExponentiation:
 			left := process(n.Left)
-			if (left.Operation == OperationNumber || left.Operation == OperationImaginary) &&
-				left.Equals(0) {
+			if isNumeric(left.Operation) && left.Equals(0) {
 				a := &Node{
 					Operation: OperationNumber,
 					Value:     "1",
 				}
 				return a
-			} else if (left.Operation == OperationNumber || left.Operation == OperationImaginary) &&
-				left.Equals(1) {
+			} else if isNumeric(left.Operation) && left.Equals(1) {
 				a := &Node{
 					Operation: OperationVariable,
 					Value:     "e",
@@ -538,15 +554,13 @@ func (n *Node) Simplify() *Node {
 			return a
 		case OperationSquareRoot:
 			left := process(n.Left)
-			if (left.Operation == OperationNumber || left.Operation == OperationImaginary) &&
-				left.Equals(0) {
+			if isNumeric(left.Operation) && left.Equals(0) {
 				a := &Node{
 					Operation: OperationNumber,
 					Value:     "0",
 				}
 				return a
-			} else if (left.Operation == OperationNumber || left.Operation == OperationImaginary) &&
-				left.Equals(1) {
+			} else if isNumeric(left.Operation) && left.Equals(1) {
 				a := &Node{
 					Operation: OperationNumber,
 					Value:     "1",

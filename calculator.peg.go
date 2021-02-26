@@ -8,6 +8,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 const endSymbol rune = 1114112
@@ -27,6 +28,8 @@ const (
 	rulematrix
 	ruleimaginary
 	rulenumber
+	ruledecimal
+	rulenotation
 	ruleexp1
 	ruleexp2
 	rulenatural
@@ -50,7 +53,6 @@ const (
 	ruleclose
 	rulesp
 	rulerow
-	rulePegText
 )
 
 var rul3s = [...]string{
@@ -65,6 +67,8 @@ var rul3s = [...]string{
 	"matrix",
 	"imaginary",
 	"number",
+	"decimal",
+	"notation",
 	"exp1",
 	"exp2",
 	"natural",
@@ -88,7 +92,6 @@ var rul3s = [...]string{
 	"close",
 	"sp",
 	"row",
-	"PegText",
 }
 
 type token32 struct {
@@ -117,7 +120,7 @@ func (node *node32) print(w io.Writer, pretty bool, buffer string) {
 			if !pretty {
 				fmt.Fprintf(w, "%v %v\n", rule, quote)
 			} else {
-				fmt.Fprintf(w, "\x1B[34m%v\x1B[m %v\n", rule, quote)
+				fmt.Fprintf(w, "\x1B[36m%v\x1B[m %v\n", rule, quote)
 			}
 			if node.up != nil {
 				print(node.up, depth+1)
@@ -203,7 +206,7 @@ func (t *tokens32) Tokens() []token32 {
 type Calculator struct {
 	Buffer string
 	buffer []rune
-	rules  [35]func() bool
+	rules  [36]func() bool
 	parse  func(rule ...int) error
 	reset  func()
 	Pretty bool
@@ -288,6 +291,12 @@ func (p *Calculator) PrintSyntaxTree() {
 
 func (p *Calculator) WriteSyntaxTree(w io.Writer) {
 	p.tokens32.WriteSyntaxTree(w, p.Buffer)
+}
+
+func (p *Calculator) SprintSyntaxTree() string {
+	var bldr strings.Builder
+	p.WriteSyntaxTree(&bldr)
+	return bldr.String()
 }
 
 func Pretty(pretty bool) func(*Calculator) error {
@@ -777,63 +786,24 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position51, tokenIndex51
 			return false
 		},
-		/* 8 imaginary <- <(<('-'? [0-9]+ ('.' [0-9]*)?)> 'i' sp)> */
+		/* 8 imaginary <- <(decimal notation? 'i' sp)> */
 		func() bool {
 			position59, tokenIndex59 := position, tokenIndex
 			{
 				position60 := position
-				{
-					position61 := position
-					{
-						position62, tokenIndex62 := position, tokenIndex
-						if buffer[position] != rune('-') {
-							goto l62
-						}
-						position++
-						goto l63
-					l62:
-						position, tokenIndex = position62, tokenIndex62
-					}
-				l63:
-					if c := buffer[position]; c < rune('0') || c > rune('9') {
-						goto l59
-					}
-					position++
-				l64:
-					{
-						position65, tokenIndex65 := position, tokenIndex
-						if c := buffer[position]; c < rune('0') || c > rune('9') {
-							goto l65
-						}
-						position++
-						goto l64
-					l65:
-						position, tokenIndex = position65, tokenIndex65
-					}
-					{
-						position66, tokenIndex66 := position, tokenIndex
-						if buffer[position] != rune('.') {
-							goto l66
-						}
-						position++
-					l68:
-						{
-							position69, tokenIndex69 := position, tokenIndex
-							if c := buffer[position]; c < rune('0') || c > rune('9') {
-								goto l69
-							}
-							position++
-							goto l68
-						l69:
-							position, tokenIndex = position69, tokenIndex69
-						}
-						goto l67
-					l66:
-						position, tokenIndex = position66, tokenIndex66
-					}
-				l67:
-					add(rulePegText, position61)
+				if !_rules[ruledecimal]() {
+					goto l59
 				}
+				{
+					position61, tokenIndex61 := position, tokenIndex
+					if !_rules[rulenotation]() {
+						goto l61
+					}
+					goto l62
+				l61:
+					position, tokenIndex = position61, tokenIndex61
+				}
+			l62:
 				if buffer[position] != rune('i') {
 					goto l59
 				}
@@ -848,74 +818,125 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position59, tokenIndex59
 			return false
 		},
-		/* 9 number <- <(<('-'? [0-9]+ ('.' [0-9]*)?)> sp)> */
+		/* 9 number <- <(decimal notation? sp)> */
 		func() bool {
-			position70, tokenIndex70 := position, tokenIndex
+			position63, tokenIndex63 := position, tokenIndex
 			{
-				position71 := position
+				position64 := position
+				if !_rules[ruledecimal]() {
+					goto l63
+				}
 				{
-					position72 := position
-					{
-						position73, tokenIndex73 := position, tokenIndex
-						if buffer[position] != rune('-') {
-							goto l73
-						}
-						position++
-						goto l74
-					l73:
-						position, tokenIndex = position73, tokenIndex73
+					position65, tokenIndex65 := position, tokenIndex
+					if !_rules[rulenotation]() {
+						goto l65
 					}
-				l74:
-					if c := buffer[position]; c < rune('0') || c > rune('9') {
-						goto l70
-					}
-					position++
-				l75:
-					{
-						position76, tokenIndex76 := position, tokenIndex
-						if c := buffer[position]; c < rune('0') || c > rune('9') {
-							goto l76
-						}
-						position++
-						goto l75
-					l76:
-						position, tokenIndex = position76, tokenIndex76
-					}
-					{
-						position77, tokenIndex77 := position, tokenIndex
-						if buffer[position] != rune('.') {
-							goto l77
-						}
-						position++
-					l79:
-						{
-							position80, tokenIndex80 := position, tokenIndex
-							if c := buffer[position]; c < rune('0') || c > rune('9') {
-								goto l80
-							}
-							position++
-							goto l79
-						l80:
-							position, tokenIndex = position80, tokenIndex80
-						}
-						goto l78
-					l77:
-						position, tokenIndex = position77, tokenIndex77
-					}
-				l78:
-					add(rulePegText, position72)
+					goto l66
+				l65:
+					position, tokenIndex = position65, tokenIndex65
 				}
+			l66:
 				if !_rules[rulesp]() {
-					goto l70
+					goto l63
 				}
-				add(rulenumber, position71)
+				add(rulenumber, position64)
 			}
 			return true
-		l70:
-			position, tokenIndex = position70, tokenIndex70
+		l63:
+			position, tokenIndex = position63, tokenIndex63
 			return false
 		},
-		/* 10 exp1 <- <('e' 'x' 'p' open e1 close)> */
+		/* 10 decimal <- <(('-' / '+')? [0-9]+ ('.' [0-9]*)?)> */
+		func() bool {
+			position67, tokenIndex67 := position, tokenIndex
+			{
+				position68 := position
+				{
+					position69, tokenIndex69 := position, tokenIndex
+					{
+						position71, tokenIndex71 := position, tokenIndex
+						if buffer[position] != rune('-') {
+							goto l72
+						}
+						position++
+						goto l71
+					l72:
+						position, tokenIndex = position71, tokenIndex71
+						if buffer[position] != rune('+') {
+							goto l69
+						}
+						position++
+					}
+				l71:
+					goto l70
+				l69:
+					position, tokenIndex = position69, tokenIndex69
+				}
+			l70:
+				if c := buffer[position]; c < rune('0') || c > rune('9') {
+					goto l67
+				}
+				position++
+			l73:
+				{
+					position74, tokenIndex74 := position, tokenIndex
+					if c := buffer[position]; c < rune('0') || c > rune('9') {
+						goto l74
+					}
+					position++
+					goto l73
+				l74:
+					position, tokenIndex = position74, tokenIndex74
+				}
+				{
+					position75, tokenIndex75 := position, tokenIndex
+					if buffer[position] != rune('.') {
+						goto l75
+					}
+					position++
+				l77:
+					{
+						position78, tokenIndex78 := position, tokenIndex
+						if c := buffer[position]; c < rune('0') || c > rune('9') {
+							goto l78
+						}
+						position++
+						goto l77
+					l78:
+						position, tokenIndex = position78, tokenIndex78
+					}
+					goto l76
+				l75:
+					position, tokenIndex = position75, tokenIndex75
+				}
+			l76:
+				add(ruledecimal, position68)
+			}
+			return true
+		l67:
+			position, tokenIndex = position67, tokenIndex67
+			return false
+		},
+		/* 11 notation <- <('e' decimal)> */
+		func() bool {
+			position79, tokenIndex79 := position, tokenIndex
+			{
+				position80 := position
+				if buffer[position] != rune('e') {
+					goto l79
+				}
+				position++
+				if !_rules[ruledecimal]() {
+					goto l79
+				}
+				add(rulenotation, position80)
+			}
+			return true
+		l79:
+			position, tokenIndex = position79, tokenIndex79
+			return false
+		},
+		/* 12 exp1 <- <('e' 'x' 'p' open e1 close)> */
 		func() bool {
 			position81, tokenIndex81 := position, tokenIndex
 			{
@@ -948,7 +969,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position81, tokenIndex81
 			return false
 		},
-		/* 11 exp2 <- <('e' '^' value)> */
+		/* 13 exp2 <- <('e' '^' value)> */
 		func() bool {
 			position83, tokenIndex83 := position, tokenIndex
 			{
@@ -971,7 +992,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position83, tokenIndex83
 			return false
 		},
-		/* 12 natural <- <('e' sp)> */
+		/* 14 natural <- <('e' sp)> */
 		func() bool {
 			position85, tokenIndex85 := position, tokenIndex
 			{
@@ -990,7 +1011,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position85, tokenIndex85
 			return false
 		},
-		/* 13 pi <- <('p' 'i' sp)> */
+		/* 15 pi <- <('p' 'i' sp)> */
 		func() bool {
 			position87, tokenIndex87 := position, tokenIndex
 			{
@@ -1013,7 +1034,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position87, tokenIndex87
 			return false
 		},
-		/* 14 prec <- <('p' 'r' 'e' 'c' open e1 close)> */
+		/* 16 prec <- <('p' 'r' 'e' 'c' open e1 close)> */
 		func() bool {
 			position89, tokenIndex89 := position, tokenIndex
 			{
@@ -1050,7 +1071,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position89, tokenIndex89
 			return false
 		},
-		/* 15 simplify <- <('s' 'i' 'm' 'p' 'l' 'i' 'f' 'y' open e1 close)> */
+		/* 17 simplify <- <('s' 'i' 'm' 'p' 'l' 'i' 'f' 'y' open e1 close)> */
 		func() bool {
 			position91, tokenIndex91 := position, tokenIndex
 			{
@@ -1103,7 +1124,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position91, tokenIndex91
 			return false
 		},
-		/* 16 derivative <- <('d' 'e' 'r' 'i' 'v' 'a' 't' 'i' 'v' 'e' open e1 close)> */
+		/* 18 derivative <- <('d' 'e' 'r' 'i' 'v' 'a' 't' 'i' 'v' 'e' open e1 close)> */
 		func() bool {
 			position93, tokenIndex93 := position, tokenIndex
 			{
@@ -1164,7 +1185,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position93, tokenIndex93
 			return false
 		},
-		/* 17 log <- <('l' 'o' 'g' open e1 close)> */
+		/* 19 log <- <('l' 'o' 'g' open e1 close)> */
 		func() bool {
 			position95, tokenIndex95 := position, tokenIndex
 			{
@@ -1197,7 +1218,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position95, tokenIndex95
 			return false
 		},
-		/* 18 sqrt <- <('s' 'q' 'r' 't' open e1 close)> */
+		/* 20 sqrt <- <('s' 'q' 'r' 't' open e1 close)> */
 		func() bool {
 			position97, tokenIndex97 := position, tokenIndex
 			{
@@ -1234,7 +1255,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position97, tokenIndex97
 			return false
 		},
-		/* 19 cos <- <('c' 'o' 's' open e1 close)> */
+		/* 21 cos <- <('c' 'o' 's' open e1 close)> */
 		func() bool {
 			position99, tokenIndex99 := position, tokenIndex
 			{
@@ -1267,7 +1288,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position99, tokenIndex99
 			return false
 		},
-		/* 20 sin <- <('s' 'i' 'n' open e1 close)> */
+		/* 22 sin <- <('s' 'i' 'n' open e1 close)> */
 		func() bool {
 			position101, tokenIndex101 := position, tokenIndex
 			{
@@ -1300,7 +1321,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position101, tokenIndex101
 			return false
 		},
-		/* 21 tan <- <('t' 'a' 'n' open e1 close)> */
+		/* 23 tan <- <('t' 'a' 'n' open e1 close)> */
 		func() bool {
 			position103, tokenIndex103 := position, tokenIndex
 			{
@@ -1333,7 +1354,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position103, tokenIndex103
 			return false
 		},
-		/* 22 sub <- <(open e1 close)> */
+		/* 24 sub <- <(open e1 close)> */
 		func() bool {
 			position105, tokenIndex105 := position, tokenIndex
 			{
@@ -1354,7 +1375,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position105, tokenIndex105
 			return false
 		},
-		/* 23 add <- <('+' sp)> */
+		/* 25 add <- <('+' sp)> */
 		func() bool {
 			position107, tokenIndex107 := position, tokenIndex
 			{
@@ -1373,7 +1394,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position107, tokenIndex107
 			return false
 		},
-		/* 24 minus <- <('-' sp)> */
+		/* 26 minus <- <('-' sp)> */
 		func() bool {
 			position109, tokenIndex109 := position, tokenIndex
 			{
@@ -1392,7 +1413,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position109, tokenIndex109
 			return false
 		},
-		/* 25 multiply <- <('*' sp)> */
+		/* 27 multiply <- <('*' sp)> */
 		func() bool {
 			position111, tokenIndex111 := position, tokenIndex
 			{
@@ -1411,7 +1432,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position111, tokenIndex111
 			return false
 		},
-		/* 26 divide <- <('/' sp)> */
+		/* 28 divide <- <('/' sp)> */
 		func() bool {
 			position113, tokenIndex113 := position, tokenIndex
 			{
@@ -1430,7 +1451,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position113, tokenIndex113
 			return false
 		},
-		/* 27 modulus <- <('%' sp)> */
+		/* 29 modulus <- <('%' sp)> */
 		func() bool {
 			position115, tokenIndex115 := position, tokenIndex
 			{
@@ -1449,7 +1470,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position115, tokenIndex115
 			return false
 		},
-		/* 28 exponentiation <- <('^' sp)> */
+		/* 30 exponentiation <- <('^' sp)> */
 		func() bool {
 			position117, tokenIndex117 := position, tokenIndex
 			{
@@ -1468,7 +1489,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position117, tokenIndex117
 			return false
 		},
-		/* 29 open <- <('(' sp)> */
+		/* 31 open <- <('(' sp)> */
 		func() bool {
 			position119, tokenIndex119 := position, tokenIndex
 			{
@@ -1487,7 +1508,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position119, tokenIndex119
 			return false
 		},
-		/* 30 close <- <(')' sp)> */
+		/* 32 close <- <(')' sp)> */
 		func() bool {
 			position121, tokenIndex121 := position, tokenIndex
 			{
@@ -1506,7 +1527,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position121, tokenIndex121
 			return false
 		},
-		/* 31 sp <- <(' ' / '\t')*> */
+		/* 33 sp <- <(' ' / '\t')*> */
 		func() bool {
 			{
 				position124 := position
@@ -1536,7 +1557,7 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			}
 			return true
 		},
-		/* 32 row <- <(';' sp)> */
+		/* 34 row <- <(';' sp)> */
 		func() bool {
 			position129, tokenIndex129 := position, tokenIndex
 			{
@@ -1555,7 +1576,6 @@ func (p *Calculator) Init(options ...func(*Calculator) error) error {
 			position, tokenIndex = position129, tokenIndex129
 			return false
 		},
-		nil,
 	}
 	p.rules = _rules
 	return nil
