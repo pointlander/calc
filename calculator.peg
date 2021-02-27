@@ -41,7 +41,7 @@ matrix <- '[' sp (e1 / row)+ ']' sp
 imaginary <- decimal notation? 'i' sp
 number <- decimal notation? sp
 decimal <- [-+]? [0-9]+ ([.] [0-9]*)?
-notation <- 'e' decimal
+notation <- "e" decimal
 exp1 <- 'exp' open e1 close
 exp2 <- 'e^' value
 natural <- 'e' sp
