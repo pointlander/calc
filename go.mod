@@ -8,5 +8,4 @@ require (
 	github.com/ALTree/bigfloat v0.0.0-20201218142103-4a33235224ec
 	github.com/c-bata/go-prompt v0.2.5
 	github.com/pointlander/c0mpl3x v0.0.0-20210103054932-b204c9ab06b0
-	github.com/texttheater/golang-levenshtein/levenshtein v0.0.0-20200805054039-cae8b0eaed6c
 )

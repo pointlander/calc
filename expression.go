@@ -9,8 +9,6 @@ import (
 	"math/big"
 	"math/rand"
 	"sort"
-
-	"github.com/texttheater/golang-levenshtein/levenshtein"
 )
 
 // Operation is a mathematical operation
@@ -699,27 +697,34 @@ func (n *Node) Integrate() *Node {
 					Operation: BinaryOperations[rnd.Intn(len(BinaryOperations))],
 					Left:      *selected,
 				}
-				switch rnd.Intn(3) {
-				case 0:
-					if rnd.Intn(2) == 0 {
-						(*selected).Right = &Node{
-							Operation: OperationNumber,
-							Value:     fmt.Sprintf("%d", rnd.Intn(10)),
-						}
-					} else {
-						(*selected).Right = &Node{
-							Operation: OperationImaginary,
-							Value:     fmt.Sprintf("%d", rnd.Intn(10)),
-						}
-					}
-				case 1:
+				if (*selected).Operation == OperationExponentiation {
 					(*selected).Right = &Node{
-						Operation: Constants[rnd.Intn(len(Constants))],
+						Operation: OperationNumber,
+						Value:     fmt.Sprintf("%d", rnd.Intn(10)),
 					}
-				case 2:
-					(*selected).Right = &Node{
-						Operation: OperationVariable,
-						Value:     "x",
+				} else {
+					switch rnd.Intn(3) {
+					case 0:
+						if rnd.Intn(2) == 0 {
+							(*selected).Right = &Node{
+								Operation: OperationNumber,
+								Value:     fmt.Sprintf("%d", rnd.Intn(10)),
+							}
+						} else {
+							(*selected).Right = &Node{
+								Operation: OperationImaginary,
+								Value:     fmt.Sprintf("%d", rnd.Intn(10)),
+							}
+						}
+					case 1:
+						(*selected).Right = &Node{
+							Operation: Constants[rnd.Intn(len(Constants))],
+						}
+					case 2:
+						(*selected).Right = &Node{
+							Operation: OperationVariable,
+							Value:     "x",
+						}
 					}
 				}
 			case 1:
@@ -786,6 +791,39 @@ func (n *Node) Integrate() *Node {
 		return n
 	}
 
+	var difference func(a, b *Node, diff int) int
+	difference = func(a, b *Node, diff int) int {
+		if a != nil && b != nil {
+			if IsNumber[a.Operation] && IsNumber[b.Operation] {
+				anumber, bnumber := big.NewInt(0), big.NewInt(0)
+				anumber.SetString(a.Value, 10)
+				bnumber.SetString(b.Value, 10)
+				anumber.Sub(anumber, bnumber)
+				anumber.Abs(anumber)
+				diff += int(anumber.Int64())
+			} else if IsConstant[a.Operation] && IsConstant[b.Operation] &&
+				a.Value != b.Value {
+				diff++
+			} else if a.Operation == OperationVariable && b.Operation == OperationVariable &&
+				a.Value != b.Value {
+				diff++
+			} else if a.Operation != b.Operation {
+				diff += 8
+			}
+			diff = difference(a.Left, b.Left, diff)
+			diff = difference(a.Right, b.Right, diff)
+		} else if a == nil && b != nil {
+			diff++
+			diff = difference(nil, b.Left, diff)
+			diff = difference(nil, b.Right, diff)
+		} else if a != nil && b == nil {
+			diff++
+			diff = difference(a.Left, nil, diff)
+			diff = difference(a.Right, nil, diff)
+		}
+		return diff
+	}
+
 	equations := make([]*Node, 0, 8)
 	for i := 0; i < 1000; i++ {
 		equations = append(equations, cp(n))
@@ -793,22 +831,27 @@ func (n *Node) Integrate() *Node {
 	for {
 		length := len(equations)
 		for i := 0; i < length; i++ {
-			mutated := mutate(equations[i])
-			mutations := rnd.Intn(3)
-			for j := 0; j < mutations; j++ {
-				mutated = mutate(mutated)
+			if rnd.Intn(3) == 0 {
+				mutated := mutate(equations[i])
+				mutations := rnd.Intn(3)
+				for j := 0; j < mutations; j++ {
+					mutated = mutate(mutated)
+				}
+				equations = append(equations, mutated)
 			}
-			equations = append(equations, mutated)
 		}
 		sort.Slice(equations, func(i, j int) bool {
-			a := equations[i].Derivative().Simplify()
-			b := equations[j].Derivative().Simplify()
-			ae := levenshtein.DistanceForStrings([]rune(a.String()), []rune(n.String()), levenshtein.DefaultOptions)
-			be := levenshtein.DistanceForStrings([]rune(b.String()), []rune(n.String()), levenshtein.DefaultOptions)
+			a := equations[i].Derivative()
+			b := equations[j].Derivative()
+			ae := difference(a, n, len(a.String()))
+			be := difference(b, n, len(b.String()))
 			return ae < be
 		})
 		equations = equations[:1000]
-		fmt.Println(equations[0].String(), equations[0].Derivative().Simplify().String())
+		for i := 0; i < 10; i++ {
+			fmt.Println(equations[i].String(), equations[i].Derivative().String())
+		}
+		fmt.Println("")
 		if equations[0].Derivative().Simplify().String() == n.String() {
 			break
 		}
