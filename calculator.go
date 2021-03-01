@@ -263,6 +263,14 @@ func (c *Calculator) Rulevalue(node *node32) Value {
 				}
 				node = node.next
 			}
+		case ruleintegrate:
+			node := node.up
+			for node != nil {
+				if node.pegRule == rulee1 {
+					return c.Ruleintegrate(node)
+				}
+				node = node.next
+			}
 		case rulelog:
 			node := node.up
 			for node != nil {
@@ -590,7 +598,7 @@ func (c *Calculator) Rulesimplify(node *node32) Value {
 	}
 }
 
-// Rulederivative computes the symbolic derivative of a number
+// Rulederivative computes the symbolic derivative of the expression
 func (c *Calculator) Rulederivative(node *node32) Value {
 	expression := c.Convert(node).Expression
 	derivative := expression.Derivative()
@@ -600,6 +608,19 @@ func (c *Calculator) Rulederivative(node *node32) Value {
 	return Value{
 		ValueType:  ValueTypeExpression,
 		Expression: derivative,
+	}
+}
+
+// Ruleintegrate computes the symbolic integral of the expression
+func (c *Calculator) Ruleintegrate(node *node32) Value {
+	expression := c.Convert(node).Expression
+	integral := expression.Simplify().Integrate()
+	if integral != nil {
+		integral = integral.Simplify()
+	}
+	return Value{
+		ValueType:  ValueTypeExpression,
+		Expression: integral,
 	}
 }
 

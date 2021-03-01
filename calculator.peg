@@ -29,6 +29,7 @@ value <- matrix
        / prec
        / simplify
        / derivative
+       / integrate
        / log
        / sqrt
        / cos
@@ -49,6 +50,7 @@ pi <- 'pi' sp
 prec <- 'prec' open e1 close
 simplify <- 'simplify' open e1 close
 derivative <- 'derivative' open e1 close
+integrate <- 'integrate' open e1 close
 log <- 'log' open e1 close
 sqrt <- 'sqrt' open e1 close
 cos <- 'cos' open e1 close

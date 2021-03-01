@@ -35,6 +35,9 @@ github.com/pointlander/c0mpl3x v0.0.0-20210103054504-d33bd969b97b h1:wV0aq3HcHMB
 github.com/pointlander/c0mpl3x v0.0.0-20210103054504-d33bd969b97b/go.mod h1:mp6FLmFsHG+AsxELsxC80FbIMbz59TGP79mnjBmTYIw=
 github.com/pointlander/c0mpl3x v0.0.0-20210103054932-b204c9ab06b0 h1:4Qazv5vEdFn8JM7K0BRbTfwmN2da6/0CpL5OCzBcwf4=
 github.com/pointlander/c0mpl3x v0.0.0-20210103054932-b204c9ab06b0/go.mod h1:kYSSqyTxdrQo1PrmK0pr9VAypgsXYMGy8K0bK8wSxeU=
+github.com/texttheater/golang-levenshtein v1.0.1 h1:+cRNoVrfiwufQPhoMzB6N0Yf/Mqajr6t1lOv8GyGE2U=
+github.com/texttheater/golang-levenshtein/levenshtein v0.0.0-20200805054039-cae8b0eaed6c h1:HelZ2kAFadG0La9d+4htN4HzQ68Bm2iM9qKMSMES6xg=
+github.com/texttheater/golang-levenshtein/levenshtein v0.0.0-20200805054039-cae8b0eaed6c/go.mod h1:JlzghshsemAMDGZLytTFY8C1JQxQPhnatWqNwUXjggo=
 golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sys v0.0.0-20190222072716-a9d3bda3a223/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
 golang.org/x/sys v0.0.0-20191008105621-543471e840be/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=

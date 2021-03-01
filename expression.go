@@ -5,7 +5,12 @@
 package calc
 
 import (
+	"fmt"
 	"math/big"
+	"math/rand"
+	"sort"
+
+	"github.com/texttheater/golang-levenshtein/levenshtein"
 )
 
 // Operation is a mathematical operation
@@ -53,6 +58,62 @@ const (
 	// OperationNotation is E notation operation
 	OperationNotation
 )
+
+var (
+	// BinaryOperations are binary operations
+	BinaryOperations = []Operation{
+		OperationAdd,
+		OperationSubtract,
+		OperationMultiply,
+		OperationDivide,
+		//OperationModulus,
+		OperationExponentiation,
+		OperationNotation,
+	}
+	// IsBinaryOperation is a map of binary operations
+	IsBinaryOperation = make(map[Operation]bool)
+	// UnaryOperations are unary operations
+	UnaryOperations = []Operation{
+		OperationNegate,
+		OperationNaturalExponentiation,
+		OperationNaturalLogarithm,
+		OperationSquareRoot,
+		OperationCosine,
+		OperationSine,
+		OperationTangent,
+	}
+	// IsUnaryOperation is a map of unary operations
+	IsUnaryOperation = make(map[Operation]bool)
+	// Numbers are numbers
+	Numbers = []Operation{
+		OperationImaginary,
+		OperationNumber,
+	}
+	// IsNumber is a map of number operations
+	IsNumber = make(map[Operation]bool)
+	// Constants are constants
+	Constants = []Operation{
+		OperationNatural,
+		OperationPI,
+	}
+	// IsConstant is a map of constant operations
+	IsConstant = make(map[Operation]bool)
+)
+
+func init() {
+	for _, operation := range BinaryOperations {
+		IsBinaryOperation[operation] = true
+	}
+	for _, operation := range UnaryOperations {
+		IsUnaryOperation[operation] = true
+	}
+	for _, operation := range Numbers {
+		IsNumber[operation] = true
+	}
+	for _, operation := range Constants {
+		IsConstant[operation] = true
+	}
+}
 
 // Node is a node in an expression binary tree
 type Node struct {
@@ -196,6 +257,10 @@ func (n *Node) Derivative() *Node {
 			square := &Node{
 				Operation: OperationExponentiation,
 				Left:      n.Right,
+				Right: &Node{
+					Operation: OperationNumber,
+					Value:     "2",
+				},
 			}
 			a := &Node{
 				Operation: OperationDivide,
@@ -594,4 +659,159 @@ func (n *Node) Simplify() *Node {
 		return nil
 	}
 	return process(n)
+}
+
+// Integrate takes the integral of the equation
+func (n *Node) Integrate() *Node {
+	rnd := rand.New(rand.NewSource(1))
+
+	var flatten func(n **Node, nodes []**Node) []**Node
+	flatten = func(n **Node, nodes []**Node) []**Node {
+		if n == nil || *n == nil {
+			return nodes
+		}
+		nodes = append(nodes, n)
+		nodes = flatten(&(*n).Left, nodes)
+		nodes = flatten(&(*n).Right, nodes)
+		return nodes
+	}
+
+	var cp func(n *Node) *Node
+	cp = func(n *Node) *Node {
+		if n == nil {
+			return nil
+		}
+		new := Node{}
+		new = *n
+		new.Left = cp(n.Left)
+		new.Right = cp(n.Right)
+		return &new
+	}
+
+	mutate := func(n *Node) *Node {
+		n = cp(n)
+		nodes := flatten(&n, nil)
+		selected := nodes[rnd.Intn(len(nodes))]
+		if rnd.Intn(2) == 0 {
+			switch rnd.Intn(3) {
+			case 0:
+				*selected = &Node{
+					Operation: BinaryOperations[rnd.Intn(len(BinaryOperations))],
+					Left:      *selected,
+				}
+				switch rnd.Intn(3) {
+				case 0:
+					if rnd.Intn(2) == 0 {
+						(*selected).Right = &Node{
+							Operation: OperationNumber,
+							Value:     fmt.Sprintf("%d", rnd.Intn(10)),
+						}
+					} else {
+						(*selected).Right = &Node{
+							Operation: OperationImaginary,
+							Value:     fmt.Sprintf("%d", rnd.Intn(10)),
+						}
+					}
+				case 1:
+					(*selected).Right = &Node{
+						Operation: Constants[rnd.Intn(len(Constants))],
+					}
+				case 2:
+					(*selected).Right = &Node{
+						Operation: OperationVariable,
+						Value:     "x",
+					}
+				}
+			case 1:
+				*selected = &Node{
+					Operation: UnaryOperations[rnd.Intn(len(UnaryOperations))],
+					Left:      *selected,
+				}
+			case 2:
+				switch rnd.Intn(3) {
+				case 0:
+					if rnd.Intn(2) == 0 {
+						*selected = &Node{
+							Operation: OperationNumber,
+							Value:     fmt.Sprintf("%d", rnd.Intn(10)),
+						}
+					} else {
+						*selected = &Node{
+							Operation: OperationImaginary,
+							Value:     fmt.Sprintf("%d", rnd.Intn(10)),
+						}
+					}
+				case 1:
+					*selected = &Node{
+						Operation: Constants[rnd.Intn(len(Constants))],
+					}
+				case 2:
+					*selected = &Node{
+						Operation: OperationVariable,
+						Value:     "x",
+					}
+				}
+			}
+		} else {
+			if IsBinaryOperation[(*selected).Operation] {
+				(*selected).Operation = BinaryOperations[rnd.Intn(len(BinaryOperations))]
+			} else if IsUnaryOperation[(*selected).Operation] {
+				(*selected).Operation = UnaryOperations[rnd.Intn(len(UnaryOperations))]
+			} else if IsNumber[(*selected).Operation] {
+				value := big.NewInt(0)
+				value.SetString((*selected).Value, 10)
+				switch rnd.Intn(3) {
+				case 0:
+					value.SetInt64(0)
+				case 1:
+					value.Add(value, big.NewInt(1))
+				case 2:
+					value.Sub(value, big.NewInt(1))
+				}
+				(*selected).Value = value.String()
+			} else if IsConstant[(*selected).Operation] {
+				if rnd.Intn(2) == 0 {
+					(*selected).Operation = OperationNumber
+					(*selected).Value = "0"
+				} else {
+					(*selected).Operation = Constants[rnd.Intn(len(Constants))]
+				}
+			} else {
+				if rnd.Intn(2) == 0 {
+					(*selected).Operation = OperationNumber
+					(*selected).Value = "0"
+				}
+			}
+		}
+		return n
+	}
+
+	equations := make([]*Node, 0, 8)
+	for i := 0; i < 1000; i++ {
+		equations = append(equations, cp(n))
+	}
+	for {
+		length := len(equations)
+		for i := 0; i < length; i++ {
+			mutated := mutate(equations[i])
+			mutations := rnd.Intn(3)
+			for j := 0; j < mutations; j++ {
+				mutated = mutate(mutated)
+			}
+			equations = append(equations, mutated)
+		}
+		sort.Slice(equations, func(i, j int) bool {
+			a := equations[i].Derivative().Simplify()
+			b := equations[j].Derivative().Simplify()
+			ae := levenshtein.DistanceForStrings([]rune(a.String()), []rune(n.String()), levenshtein.DefaultOptions)
+			be := levenshtein.DistanceForStrings([]rune(b.String()), []rune(n.String()), levenshtein.DefaultOptions)
+			return ae < be
+		})
+		equations = equations[:1000]
+		fmt.Println(equations[0].String(), equations[0].Derivative().Simplify().String())
+		if equations[0].Derivative().Simplify().String() == n.String() {
+			break
+		}
+	}
+	return equations[0]
 }
