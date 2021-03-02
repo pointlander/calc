@@ -511,7 +511,13 @@ func (c *Calculator) Convert(node *node32) Value {
 					node = node.next
 				}
 			case rulesub:
-				return convert(node)
+				node := node.up
+				for node != nil {
+					if node.pegRule == rulee1 {
+						return convert(node)
+					}
+					node = node.next
+				}
 			}
 			node = node.next
 		}

@@ -196,6 +196,10 @@ func (n *Node) Derivative() *Node {
 			square := &Node{
 				Operation: OperationExponentiation,
 				Left:      n.Right,
+				Right: &Node{
+					Operation: OperationNumber,
+					Value:     "2",
+				},
 			}
 			a := &Node{
 				Operation: OperationDivide,
