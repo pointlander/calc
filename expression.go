@@ -290,19 +290,19 @@ func (n *Node) Derivative() *Node {
 			}
 			return a
 		case OperationSquareRoot:
-			value := &Node{
+			value2 := &Node{
 				Operation: OperationNumber,
-				Value:     "0.5",
+				Value:     "2",
 			}
 			multiply := &Node{
 				Operation: OperationMultiply,
-				Left:      value,
-				Right:     process(n.Left),
+				Left:      value2,
+				Right:     n,
 			}
 			a := &Node{
 				Operation: OperationDivide,
-				Left:      multiply,
-				Right:     n,
+				Left:      process(n.Left),
+				Right:     multiply,
 			}
 			return a
 		case OperationCosine:
