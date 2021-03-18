@@ -210,17 +210,19 @@ func (n *Node) Derivative() *Node {
 		case OperationModulus:
 			return n
 		case OperationExponentiation:
-			value := big.NewInt(0)
-			value.SetString(n.Right.Value, 10)
-			value.Sub(value, big.NewInt(1))
-			constant := &Node{
+			one := &Node{
 				Operation: OperationNumber,
-				Value:     value.String(),
+				Value:     "1",
+			}
+			subtract := &Node{
+				Operation: OperationSubtract,
+				Left:      n.Right,
+				Right:     one,
 			}
 			exp := &Node{
 				Operation: OperationExponentiation,
 				Left:      n.Left,
-				Right:     constant,
+				Right:     subtract,
 			}
 			a := &Node{
 				Operation: OperationMultiply,
