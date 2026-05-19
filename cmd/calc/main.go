@@ -37,7 +37,7 @@ func main() {
 			return
 		}
 
-		cal := &calc.Calculator{Buffer: value}
+		cal := &calc.Calculator[uint32]{Buffer: value}
 		cal.Init()
 		if err := cal.Parse(); err != nil {
 			fmt.Println(err)

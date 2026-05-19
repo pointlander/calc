@@ -12,6 +12,8 @@ import (
 	complex "github.com/pointlander/c0mpl3x"
 )
 
+//go:generate go tool peg calculator.peg
+
 var prec uint = 1024
 
 // ValueType is a value type
@@ -32,12 +34,12 @@ type Value struct {
 }
 
 // Eval evaluates the expression
-func (c *Calculator) Eval() Value {
+func (c *Calculator[T]) Eval() Value {
 	return c.Rulee(c.AST())
 }
 
 // Rulee is a root expresion
-func (c *Calculator) Rulee(node *node32) Value {
+func (c *Calculator[T]) Rulee(node *node[T]) Value {
 	node = node.up
 	for node != nil {
 		switch node.pegRule {
@@ -50,7 +52,7 @@ func (c *Calculator) Rulee(node *node32) Value {
 }
 
 // Rulee1 deals with addation or subtraction
-func (c *Calculator) Rulee1(node *node32) Value {
+func (c *Calculator[T]) Rulee1(node *node[T]) Value {
 	node = node.up
 	var a Value
 	for node != nil {
@@ -72,7 +74,7 @@ func (c *Calculator) Rulee1(node *node32) Value {
 }
 
 // Rulee2 deals with multiplication, division, or modulus
-func (c *Calculator) Rulee2(node *node32) Value {
+func (c *Calculator[T]) Rulee2(node *node[T]) Value {
 	node = node.up
 	var a Value
 	for node != nil {
@@ -100,7 +102,7 @@ func (c *Calculator) Rulee2(node *node32) Value {
 }
 
 // Rulee3 deals with exponentiation
-func (c *Calculator) Rulee3(node *node32) Value {
+func (c *Calculator[T]) Rulee3(node *node[T]) Value {
 	node = node.up
 	var a Value
 	for node != nil {
@@ -118,7 +120,7 @@ func (c *Calculator) Rulee3(node *node32) Value {
 }
 
 // Rulee4 negates a number
-func (c *Calculator) Rulee4(node *node32) Value {
+func (c *Calculator[T]) Rulee4(node *node[T]) Value {
 	node = node.up
 	minus := false
 	for node != nil {
@@ -138,7 +140,7 @@ func (c *Calculator) Rulee4(node *node32) Value {
 }
 
 // Rulevalue evaluates the value
-func (c *Calculator) Rulevalue(node *node32) Value {
+func (c *Calculator[T]) Rulevalue(node *node[T]) Value {
 	node = node.up
 	for node != nil {
 		switch node.pegRule {
@@ -322,7 +324,7 @@ func (c *Calculator) Rulevalue(node *node32) Value {
 }
 
 // Rulematrix computes the matrix
-func (c *Calculator) Rulematrix(node *node32) Value {
+func (c *Calculator[T]) Rulematrix(node *node[T]) Value {
 	node = node.up
 	x := complex.NewMatrix(prec)
 	x.Values = make([][]complex.Rational, 1)
@@ -347,12 +349,12 @@ func (c *Calculator) Rulematrix(node *node32) Value {
 }
 
 // Convert converts to an expression
-func (c *Calculator) Convert(node *node32) Value {
+func (c *Calculator[T]) Convert(n *node[T]) Value {
 	var (
-		convert      func(node *node32) (a *Node)
-		convertValue func(node *node32) (a *Node)
+		convert      func(n *node[T]) (a *Node)
+		convertValue func(n *node[T]) (a *Node)
 	)
-	convertValue = func(node *node32) (a *Node) {
+	convertValue = func(node *node[T]) (a *Node) {
 		node = node.up
 		for node != nil {
 			switch node.pegRule {
@@ -523,7 +525,7 @@ func (c *Calculator) Convert(node *node32) Value {
 		}
 		return a
 	}
-	convert = func(node *node32) (a *Node) {
+	convert = func(node *node[T]) (a *Node) {
 		node = node.up
 		for node != nil {
 			switch node.pegRule {
@@ -580,12 +582,12 @@ func (c *Calculator) Convert(node *node32) Value {
 	}
 	return Value{
 		ValueType:  ValueTypeExpression,
-		Expression: convert(node),
+		Expression: convert(n),
 	}
 }
 
 // Rulesimplify simplifies the expression
-func (c *Calculator) Rulesimplify(node *node32) Value {
+func (c *Calculator[T]) Rulesimplify(node *node[T]) Value {
 	expression := c.Convert(node).Expression
 	if expression != nil {
 		expression = expression.Simplify()
@@ -597,7 +599,7 @@ func (c *Calculator) Rulesimplify(node *node32) Value {
 }
 
 // Rulederivative computes the symbolic derivative of a number
-func (c *Calculator) Rulederivative(node *node32) Value {
+func (c *Calculator[T]) Rulederivative(node *node[T]) Value {
 	expression := c.Convert(node).Expression
 	derivative := expression.Derivative()
 	if derivative != nil {
@@ -610,7 +612,7 @@ func (c *Calculator) Rulederivative(node *node32) Value {
 }
 
 // Rulesub computes the subexpression
-func (c *Calculator) Rulesub(node *node32) Value {
+func (c *Calculator[T]) Rulesub(node *node[T]) Value {
 	node = node.up
 	for node != nil {
 		switch node.pegRule {
