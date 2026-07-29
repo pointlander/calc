@@ -7,6 +7,7 @@ package calc
 import (
 	"math/big"
 
+	"github.com/ALTree/bigfloat"
 	complex "github.com/pointlander/c0mpl3x"
 )
 
@@ -194,19 +195,7 @@ func (n *Node) Eval() *complex.Matrix {
 			return &a
 		case OperationImaginary:
 			a := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
-			if n.Left != nil {
-				left := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
-				left.A.SetString(n.Left.Value)
-				right := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
-				right.A.SetString(n.Right.Value)
-				c := complex.NewRational(big.NewRat(10, 1), big.NewRat(0, 1))
-				x := complex.NewFloat(big.NewFloat(0).SetPrec(prec), big.NewFloat(0).SetPrec(prec))
-				x.SetRat(c)
-				y := complex.NewFloat(big.NewFloat(0).SetPrec(prec), big.NewFloat(0).SetPrec(prec))
-				y.SetRat(right)
-				x.Pow(x, y).Rat(right)
-				a.Mul(left, right)
-			}
+			a.A.SetString(n.Value)
 
 			a.A, a.B = a.B, a.A
 			b := complex.NewMatrix(prec)
@@ -215,6 +204,7 @@ func (n *Node) Eval() *complex.Matrix {
 		case OperationNumber:
 			a := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
 			a.A.SetString(n.Value)
+
 			b := complex.NewMatrix(prec)
 			b.Values = [][]complex.Rational{[]complex.Rational{*a}}
 			return &b
@@ -231,40 +221,49 @@ func (n *Node) Eval() *complex.Matrix {
 			y.SetRat(right)
 			x.Pow(x, y).Rat(right)
 			a.Mul(left, right)
+
+			if n.Left.Operation == OperationImaginary {
+				a.A, a.B = a.B, a.A
+			}
 			b := complex.NewMatrix(prec)
 			b.Values = [][]complex.Rational{[]complex.Rational{*a}}
 			return &b
 		case OperationNaturalExponentiation:
 			a := complex.NewMatrix(prec)
-			//return "(e^" + process(n.Left) + ")"
+			a.Exp(process(n.Left))
 			return &a
 		case OperationNatural:
-			a := complex.NewMatrix(prec)
-			//return "e"
-			return &a
+			a := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
+			b := complex.NewMatrix(prec)
+			b.Values = [][]complex.Rational{[]complex.Rational{*a}}
+			b.Exp(&b)
+			return &b
 		case OperationPI:
-			a := complex.NewMatrix(prec)
-			//return "pi"
-			return &a
+			a := big.NewRat(1, 1)
+			bigfloat.PI(prec).Rat(a)
+			b := complex.NewRational(a, big.NewRat(0, 1))
+			c := complex.NewMatrix(prec)
+			c.Values = [][]complex.Rational{[]complex.Rational{*b}}
+			return &c
 		case OperationNaturalLogarithm:
 			a := complex.NewMatrix(prec)
-			//return "log(" + process(n.Left) + ")"
+			a.Log(process(n.Left))
 			return &a
 		case OperationSquareRoot:
 			a := complex.NewMatrix(prec)
-			//return "sqrt(" + process(n.Left) + ")"
+			a.Sqrt(process(n.Left))
 			return &a
 		case OperationCosine:
 			a := complex.NewMatrix(prec)
-			//return "cos(" + process(n.Left) + ")"
+			a.Cos(process(n.Left))
 			return &a
 		case OperationSine:
 			a := complex.NewMatrix(prec)
-			//return "sin(" + process(n.Left) + ")"
+			a.Sin(process(n.Left))
 			return &a
 		case OperationTangent:
 			a := complex.NewMatrix(prec)
-			//return "tan(" + process(n.Left) + ")"
+			a.Tan(process(n.Left))
 			return &a
 		}
 		a := complex.NewMatrix(prec)

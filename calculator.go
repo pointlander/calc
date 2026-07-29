@@ -440,7 +440,10 @@ func (c *Calculator[T]) Convert(n *node[T]) Value {
 					if node.pegRule == rulevalue {
 						a = &Node{
 							Operation: OperationNaturalExponentiation,
-							Left:      convert(node),
+							Left: &Node{
+								Operation: OperationNumber,
+								Value:     strings.TrimSpace(string(c.buffer[node.begin:node.end])),
+							},
 						}
 						return a
 					}
@@ -535,6 +538,11 @@ func (c *Calculator[T]) Convert(n *node[T]) Value {
 			switch node.pegRule {
 			case rulee2, rulee3:
 				a = convert(node)
+			case rulenumber:
+				a = &Node{
+					Operation: OperationNumber,
+					Value:     a.Value,
+				}
 			case ruleadd:
 				node = node.next
 				a = &Node{
