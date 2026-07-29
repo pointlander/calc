@@ -35,7 +35,11 @@ type Value struct {
 
 // Eval evaluates the expression
 func (c *Calculator[T]) Eval() Value {
-	return c.Rulee(c.AST())
+	//return c.Rulee(c.AST())
+	value := c.Convert(c.AST().up)
+	return Value{
+		Matrix: value.Expression.Eval(),
+	}
 }
 
 // Rulee is a root expresion
@@ -436,7 +440,7 @@ func (c *Calculator[T]) Convert(n *node[T]) Value {
 					if node.pegRule == rulevalue {
 						a = &Node{
 							Operation: OperationNaturalExponentiation,
-							Left:      convert(node),
+							Left:      convertValue(node),
 						}
 						return a
 					}
