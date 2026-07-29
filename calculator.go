@@ -35,7 +35,11 @@ type Value struct {
 
 // Eval evaluates the expression
 func (c *Calculator[T]) Eval() Value {
-	return c.Rulee(c.AST())
+	//return c.Rulee(c.AST())
+	value := c.Convert(c.AST().up)
+	return Value{
+		Matrix: value.Expression.Eval(),
+	}
 }
 
 // Rulee is a root expresion
