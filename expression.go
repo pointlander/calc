@@ -581,8 +581,17 @@ func partsPriority(n *Node) int {
 	case OperationVariable:
 		return 3
 	case OperationExponentiation:
-		if n.Left.Operation == OperationVariable && isConstantExpr(n.Right) {
+		// log(x)^n counts as logarithmic for LIATE
+		if n.Left != nil && n.Left.Operation == OperationNaturalLogarithm {
+			return 1
+		}
+		if n.Left != nil && n.Left.Operation == OperationVariable && isConstantExpr(n.Right) {
 			return 3 // algebraic x^n
+		}
+		// sin(x)^n, cos(x)^n — treat as trig
+		if n.Left != nil && (n.Left.Operation == OperationSine ||
+			n.Left.Operation == OperationCosine || n.Left.Operation == OperationTangent) {
+			return 4
 		}
 		if isConstantExpr(n.Left) {
 			return 5 // exponential a^x
@@ -910,8 +919,188 @@ func powerOfVar(n *Node) (string, *Node) {
 		if n.Left != nil && n.Left.Operation == OperationVariable && isConstantExpr(n.Right) {
 			return n.Left.Value, n.Right
 		}
+	case OperationSquareRoot:
+		// sqrt(x) = x^(1/2)
+		if n.Left != nil && n.Left.Operation == OperationVariable {
+			return n.Left.Value, &Node{
+				Operation: OperationDivide,
+				Left:      nodeOne(),
+				Right:     nodeNumber("2"),
+			}
+		}
 	}
 	return "", nil
+}
+
+// linearForm reports whether n is of the form a*x + b (a, b constant; a may be 1).
+// Returns (a, b, true) on success. b may be nil meaning 0.
+func linearForm(n *Node) (a, b *Node, ok bool) {
+	if n == nil {
+		return nil, nil, false
+	}
+	switch n.Operation {
+	case OperationVariable:
+		return nodeOne(), nodeZero(), true
+	case OperationNegate:
+		if n.Left != nil && n.Left.Operation == OperationVariable {
+			return nodeNegate(nodeOne()), nodeZero(), true
+		}
+		if la, lb, lok := linearForm(n.Left); lok {
+			return nodeNegate(la), nodeNegate(lb), true
+		}
+	case OperationMultiply:
+		if isConstantExpr(n.Left) && n.Right != nil && n.Right.Operation == OperationVariable {
+			return n.Left, nodeZero(), true
+		}
+		if isConstantExpr(n.Right) && n.Left != nil && n.Left.Operation == OperationVariable {
+			return n.Right, nodeZero(), true
+		}
+	case OperationAdd:
+		// a*x + b or b + a*x
+		if isConstantExpr(n.Right) {
+			if la, lb, lok := linearForm(n.Left); lok && (lb == nil || (isNumeric(lb.Operation) && lb.Equals(0))) {
+				return la, n.Right, true
+			}
+		}
+		if isConstantExpr(n.Left) {
+			if la, lb, lok := linearForm(n.Right); lok && (lb == nil || (isNumeric(lb.Operation) && lb.Equals(0))) {
+				return la, n.Left, true
+			}
+		}
+	case OperationSubtract:
+		// a*x - b or b - a*x
+		if isConstantExpr(n.Right) {
+			if la, lb, lok := linearForm(n.Left); lok && (lb == nil || (isNumeric(lb.Operation) && lb.Equals(0))) {
+				return la, nodeNegate(n.Right), true
+			}
+		}
+		if isConstantExpr(n.Left) {
+			if la, lb, lok := linearForm(n.Right); lok && (lb == nil || (isNumeric(lb.Operation) && lb.Equals(0))) {
+				return nodeNegate(la), n.Left, true
+			}
+		}
+	}
+	return nil, nil, false
+}
+
+// chainScale divides an antiderivative F(ax+b) by the linear coefficient a.
+func chainScale(F, a *Node) *Node {
+	if a == nil || (isNumeric(a.Operation) && a.Equals(1)) {
+		return F
+	}
+	if isNumeric(a.Operation) && a.Equals(-1) {
+		return nodeNegate(F)
+	}
+	return nodeDiv(F, a)
+}
+
+// matchPowLog reports whether n is x^p or log(x)^k (k defaults to 1 for bare log).
+func matchPowLog(n *Node) (isPow, isLog bool, exp int64, ok bool) {
+	if n == nil {
+		return false, false, 0, false
+	}
+	if n.Operation == OperationVariable {
+		return true, false, 1, true
+	}
+	if n.Operation == OperationExponentiation && n.Left != nil &&
+		n.Left.Operation == OperationVariable && isConstantExpr(n.Right) {
+		if k, okk := numericInt(n.Right); okk {
+			return true, false, k, true
+		}
+	}
+	if n.Operation == OperationNaturalLogarithm && n.Left != nil &&
+		n.Left.Operation == OperationVariable {
+		return false, true, 1, true
+	}
+	if n.Operation == OperationExponentiation && n.Left != nil &&
+		n.Left.Operation == OperationNaturalLogarithm &&
+		n.Left.Left != nil && n.Left.Left.Operation == OperationVariable &&
+		isConstantExpr(n.Right) {
+		if k, okk := numericInt(n.Right); okk && k >= 1 {
+			return false, true, k, true
+		}
+	}
+	return false, false, 0, false
+}
+
+// integratePowLog computes ∫ x^n log(x)^k dx for integer n≠-1, k≥0.
+// Formula: x^(n+1)/(n+1) · log^k - k/(n+1) · ∫ x^n log^(k-1) dx
+func integratePowLog(a, b *Node, process func(*Node) *Node) *Node {
+	var nExp, kLog int64
+	var x *Node
+	// a = x^n, b = log^k or log
+	if isP, _, e, ok := matchPowLog(a); ok && isP {
+		if _, isL, k, ok2 := matchPowLog(b); ok2 && isL {
+			nExp, kLog = e, k
+			if a.Operation == OperationVariable {
+				x = a
+			} else {
+				x = a.Left
+			}
+		}
+	}
+	// a = log^k, b = x^n
+	if x == nil {
+		if _, isL, k, ok := matchPowLog(a); ok && isL {
+			if isP, _, e, ok2 := matchPowLog(b); ok2 && isP {
+				nExp, kLog = e, k
+				if b.Operation == OperationVariable {
+					x = b
+				} else {
+					x = b.Left
+				}
+			}
+		}
+	}
+	if x == nil || kLog < 0 || kLog > 6 {
+		return nil
+	}
+	if nExp == -1 {
+		// ∫ x^(-1) log^k = log^(k+1) / (k+1)
+		logNode := &Node{Operation: OperationNaturalLogarithm, Left: x}
+		if kLog == 0 {
+			return logNode
+		}
+		next := &Node{
+			Operation: OperationExponentiation,
+			Left:      logNode,
+			Right:     intNode(kLog + 1),
+		}
+		return nodeDiv(next, intNode(kLog+1))
+	}
+
+	// Recursive reduction on k
+	var reduce func(k int64) *Node
+	reduce = func(k int64) *Node {
+		// ∫ x^n = x^(n+1)/(n+1)
+		xp1 := &Node{
+			Operation: OperationExponentiation,
+			Left:      x,
+			Right:     intNode(nExp + 1),
+		}
+		base := nodeDiv(xp1, intNode(nExp+1))
+		if k == 0 {
+			return base
+		}
+		logNode := &Node{Operation: OperationNaturalLogarithm, Left: x}
+		var logPow *Node
+		if k == 1 {
+			logPow = logNode
+		} else {
+			logPow = &Node{
+				Operation: OperationExponentiation,
+				Left:      logNode,
+				Right:     intNode(k),
+			}
+		}
+		// x^(n+1)/(n+1) * log^k - k/(n+1) * ∫ x^n log^(k-1)
+		term := nodeMul(base, logPow)
+		rest := reduce(k - 1)
+		coeff := nodeDiv(intNode(k), intNode(nExp+1))
+		return nodeSub(term, nodeMul(coeff, rest))
+	}
+	_ = process
+	return reduce(kLog)
 }
 
 // foldConstant returns a canonical integer node if n evaluates to an integer constant.
@@ -976,20 +1165,16 @@ func rewriteIntegrand(n *Node) *Node {
 				if k == 1 {
 					return n.Left
 				}
+				// Fold nested arithmetic exponents to a bare integer (not ±1,0).
+				// Do not rewrite x^(-n) ↔ 1/x^n here — that loops with divide rules.
 				canonical := isNumeric(n.Right.Operation) ||
 					(n.Right.Operation == OperationNegate && n.Right.Left != nil &&
 						isNumeric(n.Right.Left.Operation))
 				if !canonical {
-					var exp *Node
-					if k < 0 {
-						exp = nodeNegate(nodeNumber(fmt.Sprintf("%d", -k)))
-					} else {
-						exp = nodeNumber(fmt.Sprintf("%d", k))
-					}
 					return &Node{
 						Operation: OperationExponentiation,
 						Left:      n.Left,
-						Right:     exp,
+						Right:     intNode(k),
 					}
 				}
 			}
@@ -1030,14 +1215,18 @@ func rewriteIntegrand(n *Node) *Node {
 		if l.Operation == OperationMultiply && isConstantExpr(l.Left) {
 			return rewriteIntegrand(nodeMul(l.Left, nodeMul(l.Right, r)))
 		}
-		if r.Operation == OperationMultiply && isConstantExpr(r.Left) {
-			return rewriteIntegrand(nodeMul(r.Left, nodeMul(l, r.Right)))
-		}
-		if r.Operation == OperationMultiply && isConstantExpr(r.Right) {
-			return rewriteIntegrand(nodeMul(r.Right, nodeMul(l, r.Left)))
-		}
 		if l.Operation == OperationMultiply && isConstantExpr(l.Right) {
 			return rewriteIntegrand(nodeMul(l.Right, nodeMul(l.Left, r)))
+		}
+		// Pull constant from right only when left is not already a bare constant
+		// (avoids c*(d*f) ↔ d*(c*f) rewrite loops).
+		if !isConstantExpr(l) {
+			if r.Operation == OperationMultiply && isConstantExpr(r.Left) {
+				return rewriteIntegrand(nodeMul(r.Left, nodeMul(l, r.Right)))
+			}
+			if r.Operation == OperationMultiply && isConstantExpr(r.Right) {
+				return rewriteIntegrand(nodeMul(r.Right, nodeMul(l, r.Left)))
+			}
 		}
 		// a * (b/c) → (a*b)/c
 		if r.Operation == OperationDivide {
@@ -1066,6 +1255,65 @@ func rewriteIntegrand(n *Node) *Node {
 			})
 		}
 	case OperationDivide:
+		// x^m / x^n → x^(m-n)
+		if v1, e1 := powerOfVar(n.Left); v1 != "" {
+			if v2, e2 := powerOfVar(n.Right); v2 == v1 {
+				return rewriteIntegrand(&Node{
+					Operation: OperationExponentiation,
+					Left:      &Node{Operation: OperationVariable, Value: v1},
+					Right:     nodeSub(e1, e2),
+				})
+			}
+		}
+		// 1/x^n → x^(-n) for n≠1 (1/x stays as division for ∫ c/x = c log x).
+		// 1/sqrt(x) → x^(-1/2)
+		if isConstantExpr(n.Left) {
+			if v, e := powerOfVar(n.Right); v != "" {
+				// Skip pure 1/x (exponent 1) to avoid fighting divide integration rules.
+				if k, ok := numericInt(e); ok && k == 1 {
+					// leave as c/x
+				} else {
+					negExp := nodeNegate(e)
+					if kk, okk := numericInt(e); okk {
+						negExp = intNode(-kk)
+					}
+					pow := &Node{
+						Operation: OperationExponentiation,
+						Left:      &Node{Operation: OperationVariable, Value: v},
+						Right:     negExp,
+					}
+					if isNumeric(n.Left.Operation) && n.Left.Equals(1) {
+						return rewriteIntegrand(pow)
+					}
+					return rewriteIntegrand(nodeMul(n.Left, pow))
+				}
+			}
+			// 1/(c*x) → (1/c)*(1/x)
+			if n.Right != nil && n.Right.Operation == OperationMultiply {
+				if isConstantExpr(n.Right.Left) && n.Right.Right != nil &&
+					n.Right.Right.Operation == OperationVariable {
+					return rewriteIntegrand(nodeMul(
+						nodeDiv(n.Left, n.Right.Left),
+						&Node{
+							Operation: OperationDivide,
+							Left:      nodeOne(),
+							Right:     n.Right.Right,
+						},
+					))
+				}
+				if isConstantExpr(n.Right.Right) && n.Right.Left != nil &&
+					n.Right.Left.Operation == OperationVariable {
+					return rewriteIntegrand(nodeMul(
+						nodeDiv(n.Left, n.Right.Right),
+						&Node{
+							Operation: OperationDivide,
+							Left:      nodeOne(),
+							Right:     n.Right.Left,
+						},
+					))
+				}
+			}
+		}
 		if n.Right != nil && n.Right.Operation == OperationVariable {
 			name := n.Right.Value
 			left := n.Left
@@ -1224,6 +1472,29 @@ func (n *Node) Integrate() *Node {
 					Right:     left,
 				}
 			}
+			// Expand (a±b)*c for integration when one factor is a sum
+			if n.Left.Operation == OperationAdd || n.Left.Operation == OperationSubtract {
+				return process(&Node{
+					Operation: n.Left.Operation,
+					Left:      &Node{Operation: OperationMultiply, Left: n.Left.Left, Right: n.Right},
+					Right:     &Node{Operation: OperationMultiply, Left: n.Left.Right, Right: n.Right},
+				})
+			}
+			if n.Right.Operation == OperationAdd || n.Right.Operation == OperationSubtract {
+				return process(&Node{
+					Operation: n.Right.Operation,
+					Left:      &Node{Operation: OperationMultiply, Left: n.Left, Right: n.Right.Left},
+					Right:     &Node{Operation: OperationMultiply, Left: n.Left, Right: n.Right.Right},
+				})
+			}
+
+			// ∫ x^n · log(x)^k via reduction (more reliable than generic IBP).
+			if r := integratePowLog(n.Left, n.Right, process); r != nil {
+				return r
+			}
+			if r := integratePowLog(n.Right, n.Left, process); r != nil {
+				return r
+			}
 
 			// Integration by parts: ∫ u dv = u v - ∫ v du
 			if partsDepth >= maxPartsDepth {
@@ -1312,8 +1583,56 @@ func (n *Node) Integrate() *Node {
 					},
 				}
 			}
-			// ∫ x^n / x^m via rewriteIntegrand handles pure powers;
-			// ∫ f/x when f is not constant: treat as f * x^(-1) with depth guard
+			// ∫ c/(a*x+b) = (c/a)·log(a*x+b)
+			if isConstantExpr(n.Left) {
+				if a, _, ok := linearForm(n.Right); ok {
+					logTerm := &Node{
+						Operation: OperationNaturalLogarithm,
+						Left:      n.Right,
+					}
+					scaled := chainScale(logTerm, a)
+					if isNumeric(n.Left.Operation) && n.Left.Equals(1) {
+						return scaled
+					}
+					return nodeMul(n.Left, scaled)
+				}
+			}
+			// ∫ log(x)/x = (log(x))^2 / 2  (substitution u=log(x))
+			if n.Left != nil && n.Left.Operation == OperationNaturalLogarithm &&
+				n.Left.Left != nil && n.Left.Left.Operation == OperationVariable &&
+				n.Right != nil && n.Right.Operation == OperationVariable &&
+				n.Left.Left.Value == n.Right.Value {
+				return &Node{
+					Operation: OperationDivide,
+					Left: &Node{
+						Operation: OperationExponentiation,
+						Left:      n.Left,
+						Right:     number("2"),
+					},
+					Right: number("2"),
+				}
+			}
+			// ∫ cos(x)/sin(x) = log(sin(x)), ∫ sin(x)/cos(x) = -log(cos(x))
+			if n.Left != nil && n.Right != nil {
+				if n.Left.Operation == OperationCosine && n.Right.Operation == OperationSine &&
+					nodesEqual(n.Left.Left, n.Right.Left) {
+					return &Node{
+						Operation: OperationNaturalLogarithm,
+						Left:      n.Right,
+					}
+				}
+				if n.Left.Operation == OperationSine && n.Right.Operation == OperationCosine &&
+					nodesEqual(n.Left.Left, n.Right.Left) {
+					return &Node{
+						Operation: OperationNegate,
+						Left: &Node{
+							Operation: OperationNaturalLogarithm,
+							Left:      n.Right,
+						},
+					}
+				}
+			}
+			// ∫ f/x when f is not constant: treat as f · x^(-1)
 			if partsDepth < maxPartsDepth && n.Right.Operation == OperationVariable {
 				inv := &Node{
 					Operation: OperationExponentiation,
@@ -1330,13 +1649,28 @@ func (n *Node) Integrate() *Node {
 				partsDepth--
 				return result
 			}
+			// ∫ 1/x^n rewritten by rewriteIntegrand; fall through product form
+			if partsDepth < maxPartsDepth && isConstantExpr(n.Left) {
+				if _, e := powerOfVar(n.Right); e != nil {
+					rewritten := rewriteIntegrand(n)
+					if rewritten != n {
+						return process(rewritten)
+					}
+				}
+			}
 			return nil
 		case OperationModulus:
 			return nil
 		case OperationExponentiation:
 			// ∫ x^n dx
-			if n.Left.Operation == OperationVariable && isConstantExpr(n.Right) {
+			if n.Left != nil && n.Left.Operation == OperationVariable && isConstantExpr(n.Right) {
 				// Special case: ∫ x^(-1) = log(x)
+				if k, ok := numericInt(n.Right); ok && k == -1 {
+					return &Node{
+						Operation: OperationNaturalLogarithm,
+						Left:      n.Left,
+					}
+				}
 				if (isNumeric(n.Right.Operation) && n.Right.Equals(-1)) ||
 					(n.Right.Operation == OperationNegate && n.Right.Left != nil &&
 						isNumeric(n.Right.Left.Operation) && n.Right.Left.Equals(1)) {
@@ -1362,8 +1696,86 @@ func (n *Node) Integrate() *Node {
 					Right:     exp,
 				}
 			}
+			// ∫ (a*x+b)^n dx = (a*x+b)^(n+1) / ((n+1)*a)  for n ≠ -1
+			if isConstantExpr(n.Right) {
+				if a, _, ok := linearForm(n.Left); ok {
+					if k, okk := numericInt(n.Right); okk && k == -1 {
+						return chainScale(&Node{
+							Operation: OperationNaturalLogarithm,
+							Left:      n.Left,
+						}, a)
+					}
+					exp := nodeAdd(n.Right, nodeOne())
+					power := &Node{
+						Operation: OperationExponentiation,
+						Left:      n.Left,
+						Right:     exp,
+					}
+					return chainScale(nodeDiv(power, exp), a)
+				}
+			}
+			// ∫ sin(x)^2 = x/2 - sin(x)cos(x)/2
+			if n.Left != nil && n.Left.Operation == OperationSine &&
+				n.Left.Left != nil && n.Left.Left.Operation == OperationVariable &&
+				isNumeric(n.Right.Operation) && n.Right.Equals(2) {
+				x := n.Left.Left
+				halfX := nodeDiv(x, number("2"))
+				sincos := nodeDiv(nodeMul(n.Left, &Node{
+					Operation: OperationCosine,
+					Left:      x,
+				}), number("2"))
+				return nodeSub(halfX, sincos)
+			}
+			// ∫ cos(x)^2 = x/2 + sin(x)cos(x)/2
+			if n.Left != nil && n.Left.Operation == OperationCosine &&
+				n.Left.Left != nil && n.Left.Left.Operation == OperationVariable &&
+				isNumeric(n.Right.Operation) && n.Right.Equals(2) {
+				x := n.Left.Left
+				halfX := nodeDiv(x, number("2"))
+				sincos := nodeDiv(nodeMul(&Node{
+					Operation: OperationSine,
+					Left:      x,
+				}, n.Left), number("2"))
+				return nodeAdd(halfX, sincos)
+			}
+			// ∫ tan(x)^2 = tan(x) - x  (since tan^2 = sec^2 - 1)
+			if n.Left != nil && n.Left.Operation == OperationTangent &&
+				n.Left.Left != nil && n.Left.Left.Operation == OperationVariable &&
+				isNumeric(n.Right.Operation) && n.Right.Equals(2) {
+				return nodeSub(n.Left, n.Left.Left)
+			}
+			// ∫ log(x)^2 dx via IBP: x·log(x)^2 - 2∫ log(x) dx
+			if n.Left != nil && n.Left.Operation == OperationNaturalLogarithm &&
+				n.Left.Left != nil && n.Left.Left.Operation == OperationVariable &&
+				isConstantExpr(n.Right) {
+				if k, ok := numericInt(n.Right); ok && k >= 1 && k <= 4 {
+					// General: ∫ log^n = x log^n - n ∫ log^(n-1)
+					x := n.Left.Left
+					logn := n
+					var ibpLog func(power int) *Node
+					ibpLog = func(power int) *Node {
+						if power == 0 {
+							return x
+						}
+						if power == 1 {
+							return nodeSub(nodeMul(x, n.Left), x)
+						}
+						logp := &Node{
+							Operation: OperationExponentiation,
+							Left:      n.Left,
+							Right:     number(fmt.Sprintf("%d", power)),
+						}
+						if int64(power) == k {
+							logp = logn
+						}
+						rest := ibpLog(power - 1)
+						return nodeSub(nodeMul(x, logp), nodeMul(number(fmt.Sprintf("%d", power)), rest))
+					}
+					return ibpLog(int(k)) // k fits in int (bounded ≤4)
+				}
+			}
 			// ∫ a^x dx = a^x / log(a) for constant a
-			if isConstantExpr(n.Left) && n.Right.Operation == OperationVariable {
+			if isConstantExpr(n.Left) && n.Right != nil && n.Right.Operation == OperationVariable {
 				return &Node{
 					Operation: OperationDivide,
 					Left:      n,
@@ -1371,6 +1783,19 @@ func (n *Node) Integrate() *Node {
 						Operation: OperationNaturalLogarithm,
 						Left:      n.Left,
 					},
+				}
+			}
+			// ∫ a^(c*x) = a^(c*x) / (c·log(a))
+			if isConstantExpr(n.Left) && n.Right != nil {
+				if a, b, ok := linearForm(n.Right); ok && (b == nil || (isNumeric(b.Operation) && b.Equals(0))) {
+					return chainScale(&Node{
+						Operation: OperationDivide,
+						Left:      n,
+						Right: &Node{
+							Operation: OperationNaturalLogarithm,
+							Left:      n.Left,
+						},
+					}, a)
 				}
 			}
 			// ∫ c^k for constant base and exponent → c^k · x
@@ -1411,7 +1836,7 @@ func (n *Node) Integrate() *Node {
 			}
 		case OperationNaturalExponentiation:
 			// ∫ e^x dx = e^x
-			if n.Left.Operation == OperationVariable {
+			if n.Left != nil && n.Left.Operation == OperationVariable {
 				return n
 			}
 			// ∫ e^c dx = e^c · x
@@ -1422,12 +1847,16 @@ func (n *Node) Integrate() *Node {
 					Right:     varNode(),
 				}
 			}
-			// ∫ e^(c·x) dx = e^(c·x) / c
-			if n.Left.Operation == OperationMultiply {
+			// ∫ e^(a*x+b) dx = e^(a*x+b) / a
+			if a, _, ok := linearForm(n.Left); ok {
+				return chainScale(n, a)
+			}
+			// ∫ e^(c·x) dx = e^(c·x) / c  (explicit multiply form)
+			if n.Left != nil && n.Left.Operation == OperationMultiply {
 				var coeff *Node
-				if isConstantExpr(n.Left.Left) && n.Left.Right.Operation == OperationVariable {
+				if isConstantExpr(n.Left.Left) && n.Left.Right != nil && n.Left.Right.Operation == OperationVariable {
 					coeff = n.Left.Left
-				} else if isConstantExpr(n.Left.Right) && n.Left.Left.Operation == OperationVariable {
+				} else if isConstantExpr(n.Left.Right) && n.Left.Left != nil && n.Left.Left.Operation == OperationVariable {
 					coeff = n.Left.Right
 				}
 				if coeff != nil {
@@ -1438,10 +1867,15 @@ func (n *Node) Integrate() *Node {
 					}
 				}
 			}
+			// ∫ e^(-x) when Negate(variable)
+			if n.Left != nil && n.Left.Operation == OperationNegate &&
+				n.Left.Left != nil && n.Left.Left.Operation == OperationVariable {
+				return nodeNegate(n)
+			}
 			return nil
 		case OperationNaturalLogarithm:
 			// ∫ log(x) dx = x·log(x) - x
-			if n.Left.Operation == OperationVariable {
+			if n.Left != nil && n.Left.Operation == OperationVariable {
 				return &Node{
 					Operation: OperationSubtract,
 					Left: &Node{
@@ -1451,6 +1885,12 @@ func (n *Node) Integrate() *Node {
 					},
 					Right: n.Left,
 				}
+			}
+			// ∫ log(a*x+b) dx via IBP / formula:
+			// ((a*x+b)·log(a*x+b) - (a*x+b)) / a
+			if a, _, ok := linearForm(n.Left); ok {
+				arg := n.Left
+				return chainScale(nodeSub(nodeMul(arg, n), arg), a)
 			}
 			// ∫ log(c) dx = log(c) · x
 			if isConstantExpr(n.Left) {
@@ -1462,8 +1902,8 @@ func (n *Node) Integrate() *Node {
 			}
 			return nil
 		case OperationSquareRoot:
-			// ∫ sqrt(x) dx = (2/3) · x^(3/2) = (2/3) · x · sqrt(x)
-			if n.Left.Operation == OperationVariable {
+			// ∫ sqrt(x) dx = (2/3) · x · sqrt(x)
+			if n.Left != nil && n.Left.Operation == OperationVariable {
 				twoThirds := &Node{
 					Operation: OperationDivide,
 					Left:      number("2"),
@@ -1480,6 +1920,12 @@ func (n *Node) Integrate() *Node {
 					Right:     xSqrt,
 				}
 			}
+			// ∫ sqrt(a*x+b) = (2/3)* (a*x+b)^(3/2) / a
+			if a, _, ok := linearForm(n.Left); ok {
+				// (2/3) * (ax+b) * sqrt(ax+b) / a
+				body := nodeMul(n.Left, n)
+				return chainScale(nodeMul(nodeDiv(number("2"), number("3")), body), a)
+			}
 			if isConstantExpr(n.Left) {
 				return &Node{
 					Operation: OperationMultiply,
@@ -1489,12 +1935,18 @@ func (n *Node) Integrate() *Node {
 			}
 			return nil
 		case OperationCosine:
-			// ∫ cos(x) dx = sin(x)
-			if n.Left.Operation == OperationVariable {
+			// ∫ cos(x) dx = sin(x); ∫ cos(ax+b) = sin(ax+b)/a
+			if n.Left != nil && n.Left.Operation == OperationVariable {
 				return &Node{
 					Operation: OperationSine,
 					Left:      n.Left,
 				}
+			}
+			if a, _, ok := linearForm(n.Left); ok {
+				return chainScale(&Node{
+					Operation: OperationSine,
+					Left:      n.Left,
+				}, a)
 			}
 			if isConstantExpr(n.Left) {
 				return &Node{
@@ -1505,8 +1957,8 @@ func (n *Node) Integrate() *Node {
 			}
 			return nil
 		case OperationSine:
-			// ∫ sin(x) dx = -cos(x)
-			if n.Left.Operation == OperationVariable {
+			// ∫ sin(x) dx = -cos(x); ∫ sin(ax+b) = -cos(ax+b)/a
+			if n.Left != nil && n.Left.Operation == OperationVariable {
 				return &Node{
 					Operation: OperationNegate,
 					Left: &Node{
@@ -1514,6 +1966,12 @@ func (n *Node) Integrate() *Node {
 						Left:      n.Left,
 					},
 				}
+			}
+			if a, _, ok := linearForm(n.Left); ok {
+				return chainScale(nodeNegate(&Node{
+					Operation: OperationCosine,
+					Left:      n.Left,
+				}), a)
 			}
 			if isConstantExpr(n.Left) {
 				return &Node{
@@ -1524,8 +1982,8 @@ func (n *Node) Integrate() *Node {
 			}
 			return nil
 		case OperationTangent:
-			// ∫ tan(x) dx = -log(cos(x))
-			if n.Left.Operation == OperationVariable {
+			// ∫ tan(x) dx = -log(cos(x)); ∫ tan(ax+b) = -log(cos(ax+b))/a
+			if n.Left != nil && n.Left.Operation == OperationVariable {
 				return &Node{
 					Operation: OperationNegate,
 					Left: &Node{
@@ -1536,6 +1994,15 @@ func (n *Node) Integrate() *Node {
 						},
 					},
 				}
+			}
+			if a, _, ok := linearForm(n.Left); ok {
+				return chainScale(nodeNegate(&Node{
+					Operation: OperationNaturalLogarithm,
+					Left: &Node{
+						Operation: OperationCosine,
+						Left:      n.Left,
+					},
+				}), a)
 			}
 			if isConstantExpr(n.Left) {
 				return &Node{
@@ -1569,6 +2036,45 @@ func intNode(v int64) *Node {
 		}
 	}
 	return nodeNumber(fmt.Sprintf("%d", v))
+}
+
+// asRational returns n as a reduced integer fraction num/den when possible.
+func asRational(n *Node) (num, den int64, ok bool) {
+	if n == nil {
+		return 0, 0, false
+	}
+	if v, ok := numericInt(n); ok {
+		return v, 1, true
+	}
+	if n.Operation == OperationDivide {
+		a, ok1 := numericInt(n.Left)
+		b, ok2 := numericInt(n.Right)
+		if ok1 && ok2 && b != 0 {
+			return a, b, true
+		}
+	}
+	if n.Operation == OperationNegate {
+		if a, b, ok := asRational(n.Left); ok {
+			return -a, b, true
+		}
+	}
+	return 0, 0, false
+}
+
+func ratNode(num, den int64) *Node {
+	if den == 0 {
+		return &Node{Operation: OperationNumber, Value: "+Inf"}
+	}
+	if den < 0 {
+		num, den = -num, -den
+	}
+	g := gcdInt(num, den)
+	num /= g
+	den /= g
+	if den == 1 {
+		return intNode(num)
+	}
+	return &Node{Operation: OperationDivide, Left: intNode(num), Right: intNode(den)}
 }
 
 func gcdInt(a, b int64) int64 {
@@ -1816,10 +2322,10 @@ func (n *Node) simplifyOnce() *Node {
 			if left == nil || right == nil {
 				return n
 			}
-			// constant folding
-			if x, ok1 := numericInt(left); ok1 {
-				if y, ok2 := numericInt(right); ok2 {
-					return intNode(x + y)
+			// constant folding (integers and simple rationals)
+			if a, ad, ok1 := asRational(left); ok1 {
+				if b, bd, ok2 := asRational(right); ok2 {
+					return ratNode(a*bd+b*ad, ad*bd)
 				}
 			}
 			if isNumeric(left.Operation) && left.Equals(0) {
@@ -1846,9 +2352,9 @@ func (n *Node) simplifyOnce() *Node {
 			if left == nil || right == nil {
 				return n
 			}
-			if x, ok1 := numericInt(left); ok1 {
-				if y, ok2 := numericInt(right); ok2 {
-					return intNode(x - y)
+			if a, ad, ok1 := asRational(left); ok1 {
+				if b, bd, ok2 := asRational(right); ok2 {
+					return ratNode(a*bd-b*ad, ad*bd)
 				}
 			}
 			if isNumeric(right.Operation) && right.Equals(0) {
@@ -1939,9 +2445,15 @@ func (n *Node) simplifyOnce() *Node {
 				if y, ok2 := numericInt(right); ok2 {
 					return intNode(x * y)
 				}
-				// c * (a/b) or c * (-f): cancel / fold without re-wrapping
-				if right.Operation == OperationDivide || right.Operation == OperationNegate {
+				// c * (-f) or c * (a/k) with integer k: cancel via mulConst
+				if right.Operation == OperationNegate {
 					return process(mulConst(x, right))
+				}
+				if right.Operation == OperationDivide {
+					if _, ok := numericInt(right.Right); ok {
+						return process(mulConst(x, right))
+					}
+					// c * (a/b) → (c*a)/b (general b handled below as a*(b/c) pattern)
 				}
 				if x == -1 {
 					return process(&Node{Operation: OperationNegate, Left: right})
@@ -1949,8 +2461,13 @@ func (n *Node) simplifyOnce() *Node {
 				return &Node{Operation: OperationMultiply, Left: intNode(x), Right: right}
 			}
 			if y, ok2 := numericInt(right); ok2 {
-				if left.Operation == OperationDivide || left.Operation == OperationNegate {
+				if left.Operation == OperationNegate {
 					return process(mulConst(y, left))
+				}
+				if left.Operation == OperationDivide {
+					if _, ok := numericInt(left.Right); ok {
+						return process(mulConst(y, left))
+					}
 				}
 				if y == -1 {
 					return process(&Node{Operation: OperationNegate, Left: left})
@@ -2152,6 +2669,23 @@ func (n *Node) simplifyOnce() *Node {
 			if isNumeric(right.Operation) && right.Equals(1) {
 				return left
 			}
+			// x^(-1) → 1/x, x^(-n) → 1/x^n for display (simplify only)
+			if left != nil && left.Operation == OperationVariable {
+				if k, ok := numericInt(right); ok && k < 0 {
+					if k == -1 {
+						return &Node{Operation: OperationDivide, Left: nodeOne(), Right: left}
+					}
+					return &Node{
+						Operation: OperationDivide,
+						Left:      nodeOne(),
+						Right: &Node{
+							Operation: OperationExponentiation,
+							Left:      left,
+							Right:     intNode(-k),
+						},
+					}
+				}
+			}
 			return &Node{Operation: OperationExponentiation, Left: left, Right: right}
 
 		case OperationNegate:
@@ -2178,15 +2712,8 @@ func (n *Node) simplifyOnce() *Node {
 					return process(mulConst(-c, left.Right))
 				}
 			}
-			if left.Operation == OperationDivide {
-				if c, ok := numericInt(left.Left); ok {
-					return process(&Node{
-						Operation: OperationDivide,
-						Left:      intNode(-c),
-						Right:     left.Right,
-					})
-				}
-			}
+			// Note: do not rewrite -(a/b) → (-a)/b; the divide rule does the reverse
+			// and together they loop.
 			return &Node{Operation: OperationNegate, Left: left}
 
 		case OperationVariable:
