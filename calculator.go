@@ -48,15 +48,14 @@ func (c *Calculator[T]) Convert(n *node[T]) Value {
 	)
 	convertValue = func(node *node[T]) (a *Node) {
 		node = node.up
+		negate := false
 		for node != nil {
 			switch node.pegRule {
 			case rulevalue:
 				a = convertValue(node)
 			case ruleminus:
-				a = &Node{
-					Operation: OperationNegate,
-					Left:      convertValue(node),
-				}
+				// e4 <- minus value / value — apply negate after the value is built
+				negate = true
 			case rulematrix:
 				node = node.up
 				x := NewMatrix(prec)
@@ -289,6 +288,12 @@ func (c *Calculator[T]) Convert(n *node[T]) Value {
 				break
 			}
 			node = node.next
+		}
+		if negate {
+			a = &Node{
+				Operation: OperationNegate,
+				Left:      a,
+			}
 		}
 		return a
 	}
