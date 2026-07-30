@@ -7,8 +7,6 @@ package calc
 import (
 	"math/big"
 	"strings"
-
-	complex "github.com/pointlander/c0mpl3x"
 )
 
 //go:generate go tool peg calculator.peg
@@ -28,7 +26,7 @@ const (
 // Value is a value
 type Value struct {
 	ValueType  ValueType
-	Matrix     *complex.Matrix
+	Matrix     *Matrix
 	Expression *Node
 }
 
@@ -61,21 +59,21 @@ func (c *Calculator[T]) Convert(n *node[T]) Value {
 				}
 			case rulematrix:
 				node = node.up
-				x := complex.NewMatrix(prec)
-				x.Values = make([][]complex.Rational, 1)
+				x := NewMatrix(prec)
+				x.Values = make([][]Rational, 1)
 				for node != nil {
 					switch node.pegRule {
 					case rulee1:
 						a, end := convert(node), len(x.Values)-1
 						if a.Value != "" {
-							ra := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
+							ra := NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
 							ra.A.SetString(a.Value)
 							x.Values[end] = append(x.Values[end], *ra)
 							break
 						}
 						panic("matrix within matrix not allowed")
 					case rulerow:
-						x.Values = append(x.Values, make([]complex.Rational, 0, 8))
+						x.Values = append(x.Values, make([]Rational, 0, 8))
 					}
 					node = node.next
 				}

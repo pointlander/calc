@@ -8,7 +8,6 @@ import (
 	"math/big"
 
 	"github.com/ALTree/bigfloat"
-	complex "github.com/pointlander/c0mpl3x"
 )
 
 // Operation is a mathematical operation
@@ -69,7 +68,7 @@ const (
 type Node struct {
 	Operation   Operation
 	Value       string
-	Matrix      *complex.Matrix
+	Matrix      *Matrix
 	Left, Right *Node
 }
 
@@ -148,41 +147,41 @@ func (n *Node) String() string {
 }
 
 // Eval evaluates an expression
-func (n *Node) Eval() (*Node, *complex.Matrix) {
+func (n *Node) Eval() (*Node, *Matrix) {
 	var expression *Node
-	var process func(n *Node) *complex.Matrix
-	process = func(n *Node) *complex.Matrix {
+	var process func(n *Node) *Matrix
+	process = func(n *Node) *Matrix {
 		if n == nil {
-			ra := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
-			a := complex.NewMatrix(prec)
-			a.Values = [][]complex.Rational{[]complex.Rational{*ra}}
+			ra := NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
+			a := NewMatrix(prec)
+			a.Values = [][]Rational{[]Rational{*ra}}
 			return &a
 		}
 		switch n.Operation {
 		case OperationNoop:
-			ra := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
-			a := complex.NewMatrix(prec)
-			a.Values = [][]complex.Rational{[]complex.Rational{*ra}}
+			ra := NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
+			a := NewMatrix(prec)
+			a.Values = [][]Rational{[]Rational{*ra}}
 			return &a
 		case OperationAdd:
-			a := complex.NewMatrix(prec)
+			a := NewMatrix(prec)
 			a.Add(process(n.Left), process(n.Right))
 			return &a
 		case OperationSubtract:
-			a := complex.NewMatrix(prec)
+			a := NewMatrix(prec)
 			a.Sub(process(n.Left), process(n.Right))
 			return &a
 		case OperationMultiply:
-			a := complex.NewMatrix(prec)
+			a := NewMatrix(prec)
 			a.Mul(process(n.Left), process(n.Right))
 			return &a
 		case OperationDivide:
-			a := complex.NewMatrix(prec)
+			a := NewMatrix(prec)
 			a.Div(process(n.Left), process(n.Right))
 			return &a
 		case OperationModulus:
-			a := complex.NewMatrix(prec)
-			a.Values = [][]complex.Rational{{*complex.NewRational(big.NewRat(0, 0), big.NewRat(0, 1))}}
+			a := NewMatrix(prec)
+			a.Values = [][]Rational{{*NewRational(big.NewRat(0, 0), big.NewRat(0, 1))}}
 			left := process(n.Left)
 			right := process(n.Right)
 			if left.Values[0][0].A.Denom().Cmp(big.NewInt(1)) == 0 && right.Values[0][0].A.Denom().Cmp(big.NewInt(1)) == 0 {
@@ -190,46 +189,46 @@ func (n *Node) Eval() (*Node, *complex.Matrix) {
 			}
 			return &a
 		case OperationExponentiation:
-			a := complex.NewMatrix(prec)
+			a := NewMatrix(prec)
 			right := process(n.Right).Values[0][0]
 			a.Pow(process(n.Left), &right)
 			return &a
 		case OperationNegate:
-			a := complex.NewMatrix(prec)
+			a := NewMatrix(prec)
 			a.Neg(process(n.Left))
 			return &a
 		case OperationMatrix:
 			return n.Matrix
 		case OperationVariable:
-			ra := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
-			a := complex.NewMatrix(prec)
-			a.Values = [][]complex.Rational{[]complex.Rational{*ra}}
+			ra := NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
+			a := NewMatrix(prec)
+			a.Values = [][]Rational{[]Rational{*ra}}
 			return &a
 		case OperationImaginary:
-			a := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
+			a := NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
 			a.A.SetString(n.Value)
 
 			a.A, a.B = a.B, a.A
-			b := complex.NewMatrix(prec)
-			b.Values = [][]complex.Rational{[]complex.Rational{*a}}
+			b := NewMatrix(prec)
+			b.Values = [][]Rational{[]Rational{*a}}
 			return &b
 		case OperationNumber:
-			a := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
+			a := NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
 			a.A.SetString(n.Value)
 
-			b := complex.NewMatrix(prec)
-			b.Values = [][]complex.Rational{[]complex.Rational{*a}}
+			b := NewMatrix(prec)
+			b.Values = [][]Rational{[]Rational{*a}}
 			return &b
 		case OperationNotation:
-			a := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
-			left := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
+			a := NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
+			left := NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
 			left.A.SetString(n.Left.Value)
-			right := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
+			right := NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
 			right.A.SetString(n.Right.Value)
-			c := complex.NewRational(big.NewRat(10, 1), big.NewRat(0, 1))
-			x := complex.NewFloat(big.NewFloat(0).SetPrec(prec), big.NewFloat(0).SetPrec(prec))
+			c := NewRational(big.NewRat(10, 1), big.NewRat(0, 1))
+			x := NewFloat(big.NewFloat(0).SetPrec(prec), big.NewFloat(0).SetPrec(prec))
 			x.SetRat(c)
-			y := complex.NewFloat(big.NewFloat(0).SetPrec(prec), big.NewFloat(0).SetPrec(prec))
+			y := NewFloat(big.NewFloat(0).SetPrec(prec), big.NewFloat(0).SetPrec(prec))
 			y.SetRat(right)
 			x.Pow(x, y).Rat(right)
 			a.Mul(left, right)
@@ -237,25 +236,25 @@ func (n *Node) Eval() (*Node, *complex.Matrix) {
 			if n.Left.Operation == OperationImaginary {
 				a.A, a.B = a.B, a.A
 			}
-			b := complex.NewMatrix(prec)
-			b.Values = [][]complex.Rational{[]complex.Rational{*a}}
+			b := NewMatrix(prec)
+			b.Values = [][]Rational{[]Rational{*a}}
 			return &b
 		case OperationNaturalExponentiation:
-			a := complex.NewMatrix(prec)
+			a := NewMatrix(prec)
 			a.Exp(process(n.Left))
 			return &a
 		case OperationNatural:
-			a := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
-			b := complex.NewMatrix(prec)
-			b.Values = [][]complex.Rational{[]complex.Rational{*a}}
+			a := NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
+			b := NewMatrix(prec)
+			b.Values = [][]Rational{[]Rational{*a}}
 			b.Exp(&b)
 			return &b
 		case OperationPI:
 			a := big.NewRat(1, 1)
 			bigfloat.PI(prec).Rat(a)
-			b := complex.NewRational(a, big.NewRat(0, 1))
-			c := complex.NewMatrix(prec)
-			c.Values = [][]complex.Rational{[]complex.Rational{*b}}
+			b := NewRational(a, big.NewRat(0, 1))
+			c := NewMatrix(prec)
+			c.Values = [][]Rational{[]Rational{*b}}
 			return &c
 		case OperationSetPrec:
 			a := process(n.Left)
@@ -273,27 +272,27 @@ func (n *Node) Eval() (*Node, *complex.Matrix) {
 			expression = derivative
 			return nil
 		case OperationNaturalLogarithm:
-			a := complex.NewMatrix(prec)
+			a := NewMatrix(prec)
 			a.Log(process(n.Left))
 			return &a
 		case OperationSquareRoot:
-			a := complex.NewMatrix(prec)
+			a := NewMatrix(prec)
 			a.Sqrt(process(n.Left))
 			return &a
 		case OperationCosine:
-			a := complex.NewMatrix(prec)
+			a := NewMatrix(prec)
 			a.Cos(process(n.Left))
 			return &a
 		case OperationSine:
-			a := complex.NewMatrix(prec)
+			a := NewMatrix(prec)
 			a.Sin(process(n.Left))
 			return &a
 		case OperationTangent:
-			a := complex.NewMatrix(prec)
+			a := NewMatrix(prec)
 			a.Tan(process(n.Left))
 			return &a
 		}
-		a := complex.NewMatrix(prec)
+		a := NewMatrix(prec)
 		return &a
 	}
 	return expression, process(n)
