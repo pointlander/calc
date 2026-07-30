@@ -1561,8 +1561,217 @@ func isNumeric(operation Operation) bool {
 	return numeric[operation]
 }
 
-// Simplify simplifies an expression
+func intNode(v int64) *Node {
+	if v < 0 {
+		return &Node{
+			Operation: OperationNegate,
+			Left:      nodeNumber(fmt.Sprintf("%d", -v)),
+		}
+	}
+	return nodeNumber(fmt.Sprintf("%d", v))
+}
+
+func gcdInt(a, b int64) int64 {
+	if a < 0 {
+		a = -a
+	}
+	if b < 0 {
+		b = -b
+	}
+	for b != 0 {
+		a, b = b, a%b
+	}
+	if a == 0 {
+		return 1
+	}
+	return a
+}
+
+// nodesEqual reports structural equality of two expression trees.
+func nodesEqual(a, b *Node) bool {
+	if a == b {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	if a.Operation != b.Operation || a.Value != b.Value {
+		return false
+	}
+	return nodesEqual(a.Left, b.Left) && nodesEqual(a.Right, b.Right)
+}
+
+// mulConst multiplies expression f by integer coefficient c, canceling
+// against a division denominator when possible.
+func mulConst(c int64, f *Node) *Node {
+	if f == nil {
+		return nil
+	}
+	if c == 0 {
+		return nodeZero()
+	}
+	if c == 1 {
+		return f
+	}
+	if c == -1 {
+		return &Node{Operation: OperationNegate, Left: f}
+	}
+	// c * (a/b) with integer b: cancel gcd(c, b)
+	if f.Operation == OperationDivide {
+		if d, ok := numericInt(f.Right); ok && d != 0 {
+			g := gcdInt(c, d)
+			c2, d2 := c/g, d/g
+			num := f.Left
+			if c2 != 1 && c2 != -1 {
+				num = &Node{Operation: OperationMultiply, Left: intNode(c2), Right: num}
+			} else if c2 == -1 {
+				num = &Node{Operation: OperationNegate, Left: num}
+			}
+			if d2 == 1 {
+				return num
+			}
+			if d2 == -1 {
+				return &Node{Operation: OperationNegate, Left: num}
+			}
+			return &Node{Operation: OperationDivide, Left: num, Right: intNode(d2)}
+		}
+	}
+	// c * (-f) = (-c) * f
+	if f.Operation == OperationNegate {
+		return mulConst(-c, f.Left)
+	}
+	return &Node{Operation: OperationMultiply, Left: intNode(c), Right: f}
+}
+
+// extractFactor returns cofactor such that n = cofactor * factor, if possible.
+func extractFactor(n, factor *Node) (*Node, bool) {
+	if n == nil || factor == nil {
+		return nil, false
+	}
+	if nodesEqual(n, factor) {
+		return nodeOne(), true
+	}
+	if n.Operation == OperationNegate {
+		if c, ok := extractFactor(n.Left, factor); ok {
+			return &Node{Operation: OperationNegate, Left: c}, true
+		}
+		return nil, false
+	}
+	if n.Operation == OperationMultiply {
+		if nodesEqual(n.Left, factor) {
+			return n.Right, true
+		}
+		if nodesEqual(n.Right, factor) {
+			return n.Left, true
+		}
+		// c * (a * factor) or c * (factor * a)
+		if n.Right != nil && n.Right.Operation == OperationMultiply {
+			if nodesEqual(n.Right.Right, factor) {
+				return &Node{Operation: OperationMultiply, Left: n.Left, Right: n.Right.Left}, true
+			}
+			if nodesEqual(n.Right.Left, factor) {
+				return &Node{Operation: OperationMultiply, Left: n.Left, Right: n.Right.Right}, true
+			}
+		}
+		if n.Left != nil && n.Left.Operation == OperationMultiply {
+			if nodesEqual(n.Left.Right, factor) {
+				return &Node{Operation: OperationMultiply, Left: n.Left.Left, Right: n.Right}, true
+			}
+			if nodesEqual(n.Left.Left, factor) {
+				return &Node{Operation: OperationMultiply, Left: n.Left.Right, Right: n.Right}, true
+			}
+		}
+	}
+	return nil, false
+}
+
+func factorCandidates(n *Node) []*Node {
+	if n == nil {
+		return nil
+	}
+	out := []*Node{n}
+	if n.Operation == OperationMultiply {
+		out = append(out, n.Left, n.Right)
+		if n.Right != nil && n.Right.Operation == OperationMultiply {
+			out = append(out, n.Right.Left, n.Right.Right)
+		}
+		if n.Left != nil && n.Left.Operation == OperationMultiply {
+			out = append(out, n.Left.Left, n.Left.Right)
+		}
+	}
+	if n.Operation == OperationNegate && n.Left != nil {
+		out = append(out, factorCandidates(n.Left)...)
+	}
+	return out
+}
+
+// factorCommon factors a common multiplier out of a sum or difference:
+// a*c ± b*c → (a±b)*c, including nested products like a*c ± k*(b*c).
+func factorCommon(op Operation, left, right *Node) *Node {
+	if left == nil || right == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	try := func(factor *Node) *Node {
+		if factor == nil {
+			return nil
+		}
+		// Don't factor out pure numbers (would just reshuffle constants).
+		if _, ok := numericInt(factor); ok {
+			return nil
+		}
+		key := factor.String()
+		if seen[key] {
+			return nil
+		}
+		seen[key] = true
+		a, ok1 := extractFactor(left, factor)
+		b, ok2 := extractFactor(right, factor)
+		if !ok1 || !ok2 {
+			return nil
+		}
+		// Avoid trivial factoring of the whole expression as 1*expr ± 0.
+		if nodesEqual(a, nodeOne()) && nodesEqual(b, nodeOne()) && op == OperationSubtract {
+			return nodeZero()
+		}
+		inner := &Node{Operation: op, Left: a, Right: b}
+		return &Node{Operation: OperationMultiply, Left: inner, Right: factor}
+	}
+
+	for _, f := range factorCandidates(left) {
+		if r := try(f); r != nil {
+			return r
+		}
+	}
+	for _, f := range factorCandidates(right) {
+		if r := try(f); r != nil {
+			return r
+		}
+	}
+	return nil
+}
+
+// Simplify simplifies an expression. Repeated passes fold constants,
+// cancel factors, remove double negations, and factor common terms.
 func (n *Node) Simplify() *Node {
+	if n == nil {
+		return nil
+	}
+	cur := n
+	for pass := 0; pass < 10; pass++ {
+		next := cur.simplifyOnce()
+		if next == nil {
+			return cur
+		}
+		if nodesEqual(cur, next) {
+			return next
+		}
+		cur = next
+	}
+	return cur
+}
+
+func (n *Node) simplifyOnce() *Node {
 	var process func(n *Node) *Node
 	process = func(n *Node) *Node {
 		if n == nil {
@@ -1571,138 +1780,415 @@ func (n *Node) Simplify() *Node {
 		switch n.Operation {
 		case OperationNoop:
 			return n
+		case OperationDerivative:
+			if n.Left == nil {
+				return n
+			}
+			inner := process(n.Left)
+			if inner == nil {
+				return nil
+			}
+			d := inner.Derivative()
+			if d == nil {
+				return nil
+			}
+			return process(d)
+		case OperationIntegrate:
+			if n.Left == nil {
+				return n
+			}
+			inner := process(n.Left)
+			if inner == nil {
+				return nil
+			}
+			i := inner.Integrate()
+			if i == nil {
+				return nil
+			}
+			return process(i)
+		case OperationSimplify:
+			if n.Left == nil {
+				return n
+			}
+			return process(n.Left)
 		case OperationAdd:
 			left, right := process(n.Left), process(n.Right)
+			if left == nil || right == nil {
+				return n
+			}
+			// constant folding
+			if x, ok1 := numericInt(left); ok1 {
+				if y, ok2 := numericInt(right); ok2 {
+					return intNode(x + y)
+				}
+			}
 			if isNumeric(left.Operation) && left.Equals(0) {
 				return right
-			} else if isNumeric(right.Operation) && right.Equals(0) {
+			}
+			if isNumeric(right.Operation) && right.Equals(0) {
 				return left
 			}
-			a := &Node{
-				Operation: OperationAdd,
-				Left:      left,
-				Right:     right,
+			// a + (-b) → a - b
+			if right.Operation == OperationNegate {
+				return process(&Node{Operation: OperationSubtract, Left: left, Right: right.Left})
 			}
-			return a
+			// (-a) + b → b - a
+			if left.Operation == OperationNegate {
+				return process(&Node{Operation: OperationSubtract, Left: right, Right: left.Left})
+			}
+			if factored := factorCommon(OperationAdd, left, right); factored != nil {
+				return process(factored)
+			}
+			return &Node{Operation: OperationAdd, Left: left, Right: right}
+
 		case OperationSubtract:
 			left, right := process(n.Left), process(n.Right)
-			if isNumeric(left.Operation) && left.Equals(0) {
-				a := &Node{
-					Operation: OperationNegate,
-					Left:      right,
+			if left == nil || right == nil {
+				return n
+			}
+			if x, ok1 := numericInt(left); ok1 {
+				if y, ok2 := numericInt(right); ok2 {
+					return intNode(x - y)
 				}
-				return a
-			} else if isNumeric(right.Operation) && right.Equals(0) {
+			}
+			if isNumeric(right.Operation) && right.Equals(0) {
 				return left
 			}
-			a := &Node{
-				Operation: OperationSubtract,
-				Left:      left,
-				Right:     right,
+			if isNumeric(left.Operation) && left.Equals(0) {
+				return process(&Node{Operation: OperationNegate, Left: right})
 			}
-			return a
+			// a - (-b) → a + b
+			if right.Operation == OperationNegate {
+				return process(&Node{Operation: OperationAdd, Left: left, Right: right.Left})
+			}
+			// a - a → 0
+			if nodesEqual(left, right) {
+				return nodeZero()
+			}
+			// a - (b - c) → a - b + c
+			if right.Operation == OperationSubtract {
+				return process(&Node{
+					Operation: OperationAdd,
+					Left:      &Node{Operation: OperationSubtract, Left: left, Right: right.Left},
+					Right:     right.Right,
+				})
+			}
+			// a - c*(b - d) → a - c*b + c*d  (polynomial expansion)
+			if right.Operation == OperationMultiply {
+				if c, ok := numericInt(right.Left); ok && right.Right != nil &&
+					right.Right.Operation == OperationSubtract {
+					cb := &Node{Operation: OperationMultiply, Left: intNode(c), Right: right.Right.Left}
+					cd := &Node{Operation: OperationMultiply, Left: intNode(c), Right: right.Right.Right}
+					return process(&Node{
+						Operation: OperationAdd,
+						Left:      &Node{Operation: OperationSubtract, Left: left, Right: cb},
+						Right:     cd,
+					})
+				}
+			}
+			// Expand c*(a±b) - d only when d shares a factor with a term inside,
+			// enabling cleanup like 2*(x*sin+cos) - x^2*cos.
+			if left.Operation == OperationMultiply {
+				if c, ok := numericInt(left.Left); ok && left.Right != nil {
+					innerOp := left.Right.Operation
+					if innerOp == OperationAdd || innerOp == OperationSubtract {
+						a := left.Right.Left
+						b := left.Right.Right
+						ca := &Node{Operation: OperationMultiply, Left: intNode(c), Right: a}
+						cb := &Node{Operation: OperationMultiply, Left: intNode(c), Right: b}
+						if factorCommon(OperationSubtract, ca, right) != nil ||
+							factorCommon(OperationSubtract, cb, right) != nil {
+							expanded := &Node{Operation: innerOp, Left: ca, Right: cb}
+							return process(&Node{Operation: OperationSubtract, Left: expanded, Right: right})
+						}
+					}
+				}
+			}
+			// (a+b)-c → a+(b-c) or (a-c)+b when that factors
+			if left.Operation == OperationAdd {
+				if factored := factorCommon(OperationSubtract, left.Right, right); factored != nil {
+					return process(&Node{Operation: OperationAdd, Left: left.Left, Right: factored})
+				}
+				if factored := factorCommon(OperationSubtract, left.Left, right); factored != nil {
+					return process(&Node{Operation: OperationAdd, Left: factored, Right: left.Right})
+				}
+			}
+			if factored := factorCommon(OperationSubtract, left, right); factored != nil {
+				return process(factored)
+			}
+			return &Node{Operation: OperationSubtract, Left: left, Right: right}
+
 		case OperationMultiply:
 			left, right := process(n.Left), process(n.Right)
+			if left == nil || right == nil {
+				return n
+			}
 			if isNumeric(left.Operation) && left.Equals(0) {
-				a := &Node{
-					Operation: OperationNumber,
-					Value:     "0",
-				}
-				return a
-			} else if isNumeric(right.Operation) && right.Equals(0) {
-				a := &Node{
-					Operation: OperationNumber,
-					Value:     "0",
-				}
-				return a
-			} else if isNumeric(left.Operation) && left.Equals(1) {
+				return nodeZero()
+			}
+			if isNumeric(right.Operation) && right.Equals(0) {
+				return nodeZero()
+			}
+			if isNumeric(left.Operation) && left.Equals(1) {
 				return right
-			} else if isNumeric(right.Operation) && right.Equals(1) {
+			}
+			if isNumeric(right.Operation) && right.Equals(1) {
 				return left
 			}
-			a := &Node{
-				Operation: OperationMultiply,
-				Left:      left,
-				Right:     right,
+			if x, ok1 := numericInt(left); ok1 {
+				if y, ok2 := numericInt(right); ok2 {
+					return intNode(x * y)
+				}
+				// c * (a/b) or c * (-f): cancel / fold without re-wrapping
+				if right.Operation == OperationDivide || right.Operation == OperationNegate {
+					return process(mulConst(x, right))
+				}
+				if x == -1 {
+					return process(&Node{Operation: OperationNegate, Left: right})
+				}
+				return &Node{Operation: OperationMultiply, Left: intNode(x), Right: right}
 			}
-			return a
+			if y, ok2 := numericInt(right); ok2 {
+				if left.Operation == OperationDivide || left.Operation == OperationNegate {
+					return process(mulConst(y, left))
+				}
+				if y == -1 {
+					return process(&Node{Operation: OperationNegate, Left: left})
+				}
+				// prefer constant on the left
+				return &Node{Operation: OperationMultiply, Left: intNode(y), Right: left}
+			}
+			// (-a)*(-b) → a*b
+			if left.Operation == OperationNegate && right.Operation == OperationNegate {
+				return process(&Node{Operation: OperationMultiply, Left: left.Left, Right: right.Left})
+			}
+			// (-a)*b → -(a*b)
+			if left.Operation == OperationNegate {
+				return process(&Node{
+					Operation: OperationNegate,
+					Left:      &Node{Operation: OperationMultiply, Left: left.Left, Right: right},
+				})
+			}
+			if right.Operation == OperationNegate {
+				return process(&Node{
+					Operation: OperationNegate,
+					Left:      &Node{Operation: OperationMultiply, Left: left, Right: right.Left},
+				})
+			}
+			// a * (b/c) → (a*b)/c
+			if right.Operation == OperationDivide {
+				return process(&Node{
+					Operation: OperationDivide,
+					Left:      &Node{Operation: OperationMultiply, Left: left, Right: right.Left},
+					Right:     right.Right,
+				})
+			}
+			// (a/b) * c → (a*c)/b
+			if left.Operation == OperationDivide {
+				return process(&Node{
+					Operation: OperationDivide,
+					Left:      &Node{Operation: OperationMultiply, Left: left.Left, Right: right},
+					Right:     left.Right,
+				})
+			}
+			// (c*a)*b → c*(a*b) when c is constant
+			if left.Operation == OperationMultiply {
+				if c, ok := numericInt(left.Left); ok {
+					inner := process(&Node{
+						Operation: OperationMultiply,
+						Left:      left.Right,
+						Right:     right,
+					})
+					if c == 1 {
+						return inner
+					}
+					if c == -1 {
+						return process(&Node{Operation: OperationNegate, Left: inner})
+					}
+					if inner != nil && (inner.Operation == OperationDivide || inner.Operation == OperationNegate) {
+						return process(mulConst(c, inner))
+					}
+					return &Node{Operation: OperationMultiply, Left: intNode(c), Right: inner}
+				}
+			}
+			return &Node{Operation: OperationMultiply, Left: left, Right: right}
+
 		case OperationDivide:
 			left, right := process(n.Left), process(n.Right)
+			if left == nil || right == nil {
+				return n
+			}
+			// integer division when exact
+			if x, ok1 := numericInt(left); ok1 {
+				if y, ok2 := numericInt(right); ok2 && y != 0 {
+					if x%y == 0 {
+						return intNode(x / y)
+					}
+					// reduce fraction x/y
+					g := gcdInt(x, y)
+					x2, y2 := x/g, y/g
+					if y2 < 0 {
+						x2, y2 = -x2, -y2
+					}
+					if y2 == 1 {
+						return intNode(x2)
+					}
+					return &Node{Operation: OperationDivide, Left: intNode(x2), Right: intNode(y2)}
+				}
+			}
 			if isNumeric(left.Operation) && left.Equals(0) {
-				a := &Node{
-					Operation: OperationNumber,
-					Value:     "0",
-				}
-				return a
-			} else if isNumeric(right.Operation) && right.Equals(0) {
-				a := &Node{
-					Operation: OperationNumber,
-					Value:     "+Inf",
-				}
-				return a
-			} else if isNumeric(right.Operation) && right.Equals(1) {
+				return nodeZero()
+			}
+			if isNumeric(right.Operation) && right.Equals(0) {
+				return &Node{Operation: OperationNumber, Value: "+Inf"}
+			}
+			if isNumeric(right.Operation) && right.Equals(1) {
 				return left
 			}
-			a := &Node{
-				Operation: OperationDivide,
-				Left:      left,
-				Right:     right,
+			if y, ok := numericInt(right); ok && y == -1 {
+				return process(&Node{Operation: OperationNegate, Left: left})
 			}
-			return a
+			// a/a → 1
+			if nodesEqual(left, right) {
+				return nodeOne()
+			}
+			// (a/b)/c → a/(b*c)
+			if left.Operation == OperationDivide {
+				return process(&Node{
+					Operation: OperationDivide,
+					Left:      left.Left,
+					Right: &Node{
+						Operation: OperationMultiply,
+						Left:      left.Right,
+						Right:     right,
+					},
+				})
+			}
+			// a/(b/c) → (a*c)/b
+			if right.Operation == OperationDivide {
+				return process(&Node{
+					Operation: OperationDivide,
+					Left: &Node{
+						Operation: OperationMultiply,
+						Left:      left,
+						Right:     right.Right,
+					},
+					Right: right.Left,
+				})
+			}
+			// (c*a)/d with integer c,d → cancel when gcd(|c|,|d|) > 1
+			if left.Operation == OperationMultiply {
+				if c, ok := numericInt(left.Left); ok {
+					if d, ok2 := numericInt(right); ok2 && d != 0 {
+						if g := gcdInt(c, d); g > 1 {
+							return process(mulConst(c, &Node{
+								Operation: OperationDivide,
+								Left:      left.Right,
+								Right:     intNode(d),
+							}))
+						}
+					}
+				}
+				if c, ok := numericInt(left.Right); ok {
+					if d, ok2 := numericInt(right); ok2 && d != 0 {
+						if g := gcdInt(c, d); g > 1 {
+							return process(mulConst(c, &Node{
+								Operation: OperationDivide,
+								Left:      left.Left,
+								Right:     intNode(d),
+							}))
+						}
+					}
+				}
+			}
+			// (-a)/b → -(a/b), a/(-b) → -(a/b)
+			if left.Operation == OperationNegate {
+				return process(&Node{
+					Operation: OperationNegate,
+					Left:      &Node{Operation: OperationDivide, Left: left.Left, Right: right},
+				})
+			}
+			if right.Operation == OperationNegate {
+				return process(&Node{
+					Operation: OperationNegate,
+					Left:      &Node{Operation: OperationDivide, Left: left, Right: right.Left},
+				})
+			}
+			return &Node{Operation: OperationDivide, Left: left, Right: right}
+
 		case OperationModulus:
 			left, right := process(n.Left), process(n.Right)
 			if isNumeric(right.Operation) && right.Equals(1) {
 				return left
 			}
-			a := &Node{
-				Operation: OperationModulus,
-				Left:      left,
-				Right:     right,
-			}
-			return a
+			return &Node{Operation: OperationModulus, Left: left, Right: right}
+
 		case OperationExponentiation:
 			left, right := process(n.Left), process(n.Right)
+			// fold constant exponent arithmetic already done by process on right
+			if x, ok1 := numericInt(left); ok1 {
+				if y, ok2 := numericInt(right); ok2 && y >= 0 && y <= 20 {
+					// small non-negative integer powers of integers
+					res := int64(1)
+					for i := int64(0); i < y; i++ {
+						res *= x
+					}
+					return intNode(res)
+				}
+			}
 			if isNumeric(left.Operation) && left.Equals(0) {
-				a := &Node{
-					Operation: OperationNumber,
-					Value:     "0",
+				// 0^0 → 1 by convention here; 0^n → 0 for n>0 handled if right not 0
+				if isNumeric(right.Operation) && right.Equals(0) {
+					return nodeOne()
 				}
-				return a
-			} else if isNumeric(right.Operation) && right.Equals(0) {
-				a := &Node{
-					Operation: OperationNumber,
-					Value:     "1",
-				}
-				return a
-			} else if isNumeric(left.Operation) && left.Equals(1) {
-				a := &Node{
-					Operation: OperationNumber,
-					Value:     "1",
-				}
-				return a
-			} else if isNumeric(right.Operation) && right.Equals(1) {
+				return nodeZero()
+			}
+			if isNumeric(right.Operation) && right.Equals(0) {
+				return nodeOne()
+			}
+			if isNumeric(left.Operation) && left.Equals(1) {
+				return nodeOne()
+			}
+			if isNumeric(right.Operation) && right.Equals(1) {
 				return left
 			}
-			a := &Node{
-				Operation: OperationExponentiation,
-				Left:      left,
-				Right:     right,
-			}
-			return a
+			return &Node{Operation: OperationExponentiation, Left: left, Right: right}
+
 		case OperationNegate:
 			left := process(n.Left)
+			if left == nil {
+				return n
+			}
+			// --x → x
+			if left.Operation == OperationNegate {
+				return left.Left
+			}
 			if isNumeric(left.Operation) && left.Equals(0) {
-				a := &Node{
-					Operation: OperationNumber,
-					Value:     "0",
+				return nodeZero()
+			}
+			// fold -(-n) already; -k for number stays as Negate for display
+			// -(a - b) → b - a
+			if left.Operation == OperationSubtract {
+				return process(&Node{Operation: OperationSubtract, Left: left.Right, Right: left.Left})
+			}
+			// -(a + b) → (-a) + (-b) → -a - b, keep as Negate of sum for structure
+			// -(c*f) with c int → (-c)*f
+			if left.Operation == OperationMultiply {
+				if c, ok := numericInt(left.Left); ok {
+					return process(mulConst(-c, left.Right))
 				}
-				return a
 			}
-			a := &Node{
-				Operation: OperationNegate,
-				Left:      left,
+			if left.Operation == OperationDivide {
+				if c, ok := numericInt(left.Left); ok {
+					return process(&Node{
+						Operation: OperationDivide,
+						Left:      intNode(-c),
+						Right:     left.Right,
+					})
+				}
 			}
-			return a
+			return &Node{Operation: OperationNegate, Left: left}
+
 		case OperationVariable:
 			return n
 		case OperationImaginary:
@@ -1714,23 +2200,11 @@ func (n *Node) Simplify() *Node {
 		case OperationNaturalExponentiation:
 			left := process(n.Left)
 			if isNumeric(left.Operation) && left.Equals(0) {
-				a := &Node{
-					Operation: OperationNumber,
-					Value:     "1",
-				}
-				return a
+				return nodeOne()
 			} else if isNumeric(left.Operation) && left.Equals(1) {
-				a := &Node{
-					Operation: OperationVariable,
-					Value:     "e",
-				}
-				return a
+				return &Node{Operation: OperationNatural}
 			}
-			a := &Node{
-				Operation: OperationNaturalExponentiation,
-				Left:      left,
-			}
-			return a
+			return &Node{Operation: OperationNaturalExponentiation, Left: left}
 		case OperationNatural:
 			return n
 		case OperationPI:
@@ -1738,51 +2212,23 @@ func (n *Node) Simplify() *Node {
 		case OperationNaturalLogarithm:
 			left := process(n.Left)
 			if left.Operation == OperationNatural {
-				return left
+				return nodeOne() // log(e) = 1
 			}
-			a := &Node{
-				Operation: OperationNaturalLogarithm,
-				Left:      left,
-			}
-			return a
+			return &Node{Operation: OperationNaturalLogarithm, Left: left}
 		case OperationSquareRoot:
 			left := process(n.Left)
 			if isNumeric(left.Operation) && left.Equals(0) {
-				a := &Node{
-					Operation: OperationNumber,
-					Value:     "0",
-				}
-				return a
+				return nodeZero()
 			} else if isNumeric(left.Operation) && left.Equals(1) {
-				a := &Node{
-					Operation: OperationNumber,
-					Value:     "1",
-				}
-				return a
+				return nodeOne()
 			}
-			a := &Node{
-				Operation: OperationSquareRoot,
-				Left:      left,
-			}
-			return a
+			return &Node{Operation: OperationSquareRoot, Left: left}
 		case OperationCosine:
-			a := &Node{
-				Operation: OperationCosine,
-				Left:      process(n.Left),
-			}
-			return a
+			return &Node{Operation: OperationCosine, Left: process(n.Left)}
 		case OperationSine:
-			a := &Node{
-				Operation: OperationSine,
-				Left:      process(n.Left),
-			}
-			return a
+			return &Node{Operation: OperationSine, Left: process(n.Left)}
 		case OperationTangent:
-			a := &Node{
-				Operation: OperationTangent,
-				Left:      process(n.Left),
-			}
-			return a
+			return &Node{Operation: OperationTangent, Left: process(n.Left)}
 		}
 		return nil
 	}
