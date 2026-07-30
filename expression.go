@@ -50,6 +50,8 @@ const (
 	OperationSimplify
 	// OperationDerivative compute the symbolic derivative
 	OperationDerivative
+	// OperationIntegrate integrates the equation
+	OperationIntegrate
 	// OperationNaturalLogarithm os the natural logarithm
 	OperationNaturalLogarithm
 	// OperationSquareRoot computes the square root of a number
@@ -267,9 +269,11 @@ func (n *Node) Eval() (*Node, *Matrix) {
 			}
 			expression = derivative
 			return nil
+		case OperationIntegrate:
+			expression = n.Left.Integrate()
+			return nil
 		case OperationSimplify:
-			derivative := n.Left.Simplify()
-			expression = derivative
+			expression = n.Left.Simplify()
 			return nil
 		case OperationNaturalLogarithm:
 			a := NewMatrix(prec)
@@ -525,6 +529,12 @@ func (n *Node) Derivative() *Node {
 		return nil
 	}
 	return process(n)
+}
+
+// Integrate integrates the expression
+func (n *Node) Integrate() *Node {
+	// TODO: add integration code
+	return nil
 }
 
 var numeric = map[Operation]bool{

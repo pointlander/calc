@@ -41,6 +41,7 @@ const (
 	ruleprec
 	rulesimplify
 	rulederivative
+	ruleintegrate
 	rulelog
 	rulesqrt
 	rulecos
@@ -80,6 +81,7 @@ var rul3s = [...]string{
 	"prec",
 	"simplify",
 	"derivative",
+	"integrate",
 	"log",
 	"sqrt",
 	"cos",
@@ -218,7 +220,7 @@ func (t *tokens[U]) Tokens() []token[U] {
 type Calculator[U Uint] struct {
 	Buffer         string
 	buffer         []rune
-	rules          [36]func() bool
+	rules          [37]func() bool
 	parse          func(rule ...int) error
 	reset          func()
 	Pretty         bool
@@ -634,7 +636,7 @@ func (p *Calculator[U]) Init(options ...func(*Calculator[U]) error) error {
 			position, tokenIndex = position20, tokenIndex20
 			return false
 		},
-		/* 5 value <- <(matrix / imaginary / number / exp1 / exp2 / natural / pi / prec / simplify / derivative / log / sqrt / cos / sin / tan / variable / sub)> */
+		/* 5 value <- <(matrix / imaginary / number / exp1 / exp2 / natural / pi / prec / simplify / derivative / integrate / log / sqrt / cos / sin / tan / variable / sub)> */
 		func() bool {
 			if memoized, ok := memoization[memoKey[U]{5, position}]; ok {
 				return memoizedResult(memoized)
@@ -704,41 +706,47 @@ func (p *Calculator[U]) Init(options ...func(*Calculator[U]) error) error {
 					goto l26
 				l36:
 					position, tokenIndex = position26, tokenIndex26
-					if !_rules[rulelog]() {
+					if !_rules[ruleintegrate]() {
 						goto l37
 					}
 					goto l26
 				l37:
 					position, tokenIndex = position26, tokenIndex26
-					if !_rules[rulesqrt]() {
+					if !_rules[rulelog]() {
 						goto l38
 					}
 					goto l26
 				l38:
 					position, tokenIndex = position26, tokenIndex26
-					if !_rules[rulecos]() {
+					if !_rules[rulesqrt]() {
 						goto l39
 					}
 					goto l26
 				l39:
 					position, tokenIndex = position26, tokenIndex26
-					if !_rules[rulesin]() {
+					if !_rules[rulecos]() {
 						goto l40
 					}
 					goto l26
 				l40:
 					position, tokenIndex = position26, tokenIndex26
-					if !_rules[ruletan]() {
+					if !_rules[rulesin]() {
 						goto l41
 					}
 					goto l26
 				l41:
 					position, tokenIndex = position26, tokenIndex26
-					if !_rules[rulevariable]() {
+					if !_rules[ruletan]() {
 						goto l42
 					}
 					goto l26
 				l42:
+					position, tokenIndex = position26, tokenIndex26
+					if !_rules[rulevariable]() {
+						goto l43
+					}
+					goto l26
+				l43:
 					position, tokenIndex = position26, tokenIndex26
 					if !_rules[rulesub]() {
 						goto l24
@@ -759,54 +767,54 @@ func (p *Calculator[U]) Init(options ...func(*Calculator[U]) error) error {
 			if memoized, ok := memoization[memoKey[U]{6, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position43, tokenIndex43 := position, tokenIndex
+			position44, tokenIndex44 := position, tokenIndex
 			{
-				position44 := position
+				position45 := position
+				{
+					position48, tokenIndex48 := position, tokenIndex
+					if c := buffer[position]; c < 'A' || c > 'Z' {
+						goto l49
+					}
+					position++
+					goto l48
+				l49:
+					position, tokenIndex = position48, tokenIndex48
+					if c := buffer[position]; c < 'a' || c > 'z' {
+						goto l44
+					}
+					position++
+				}
+			l48:
+			l46:
 				{
 					position47, tokenIndex47 := position, tokenIndex
-					if c := buffer[position]; c < 'A' || c > 'Z' {
-						goto l48
-					}
-					position++
-					goto l47
-				l48:
-					position, tokenIndex = position47, tokenIndex47
-					if c := buffer[position]; c < 'a' || c > 'z' {
-						goto l43
-					}
-					position++
-				}
-			l47:
-			l45:
-				{
-					position46, tokenIndex46 := position, tokenIndex
 					{
-						position49, tokenIndex49 := position, tokenIndex
+						position50, tokenIndex50 := position, tokenIndex
 						if c := buffer[position]; c < 'A' || c > 'Z' {
-							goto l50
+							goto l51
 						}
 						position++
-						goto l49
-					l50:
-						position, tokenIndex = position49, tokenIndex49
+						goto l50
+					l51:
+						position, tokenIndex = position50, tokenIndex50
 						if c := buffer[position]; c < 'a' || c > 'z' {
-							goto l46
+							goto l47
 						}
 						position++
 					}
-				l49:
-					goto l45
-				l46:
-					position, tokenIndex = position46, tokenIndex46
+				l50:
+					goto l46
+				l47:
+					position, tokenIndex = position47, tokenIndex47
 				}
 				_rules[rulesp]()
-				add(rulevariable, position44)
+				add(rulevariable, position45)
 			}
-			memoize(6, position43, tokenIndex43, true)
+			memoize(6, position44, tokenIndex44, true)
 			return true
-		l43:
-			memoize(6, position43, tokenIndex43, false)
-			position, tokenIndex = position43, tokenIndex43
+		l44:
+			memoize(6, position44, tokenIndex44, false)
+			position, tokenIndex = position44, tokenIndex44
 			return false
 		},
 		/* 7 matrix <- <('[' sp (e1 / row)+ ']' sp)> */
@@ -814,59 +822,59 @@ func (p *Calculator[U]) Init(options ...func(*Calculator[U]) error) error {
 			if memoized, ok := memoization[memoKey[U]{7, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position51, tokenIndex51 := position, tokenIndex
+			position52, tokenIndex52 := position, tokenIndex
 			{
-				position52 := position
+				position53 := position
 				if buffer[position] != '[' {
-					goto l51
+					goto l52
 				}
 				position++
 				_rules[rulesp]()
+				{
+					position56, tokenIndex56 := position, tokenIndex
+					if !_rules[rulee1]() {
+						goto l57
+					}
+					goto l56
+				l57:
+					position, tokenIndex = position56, tokenIndex56
+					if !_rules[rulerow]() {
+						goto l52
+					}
+				}
+			l56:
+			l54:
 				{
 					position55, tokenIndex55 := position, tokenIndex
-					if !_rules[rulee1]() {
-						goto l56
-					}
-					goto l55
-				l56:
-					position, tokenIndex = position55, tokenIndex55
-					if !_rules[rulerow]() {
-						goto l51
-					}
-				}
-			l55:
-			l53:
-				{
-					position54, tokenIndex54 := position, tokenIndex
 					{
-						position57, tokenIndex57 := position, tokenIndex
+						position58, tokenIndex58 := position, tokenIndex
 						if !_rules[rulee1]() {
-							goto l58
+							goto l59
 						}
-						goto l57
-					l58:
-						position, tokenIndex = position57, tokenIndex57
+						goto l58
+					l59:
+						position, tokenIndex = position58, tokenIndex58
 						if !_rules[rulerow]() {
-							goto l54
+							goto l55
 						}
 					}
-				l57:
-					goto l53
-				l54:
-					position, tokenIndex = position54, tokenIndex54
+				l58:
+					goto l54
+				l55:
+					position, tokenIndex = position55, tokenIndex55
 				}
 				if buffer[position] != ']' {
-					goto l51
+					goto l52
 				}
 				position++
 				_rules[rulesp]()
-				add(rulematrix, position52)
+				add(rulematrix, position53)
 			}
-			memoize(7, position51, tokenIndex51, true)
+			memoize(7, position52, tokenIndex52, true)
 			return true
-		l51:
-			memoize(7, position51, tokenIndex51, false)
-			position, tokenIndex = position51, tokenIndex51
+		l52:
+			memoize(7, position52, tokenIndex52, false)
+			position, tokenIndex = position52, tokenIndex52
 			return false
 		},
 		/* 8 imaginary <- <(decimal notation? 'i' sp)> */
@@ -874,34 +882,34 @@ func (p *Calculator[U]) Init(options ...func(*Calculator[U]) error) error {
 			if memoized, ok := memoization[memoKey[U]{8, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position59, tokenIndex59 := position, tokenIndex
+			position60, tokenIndex60 := position, tokenIndex
 			{
-				position60 := position
+				position61 := position
 				if !_rules[ruledecimal]() {
-					goto l59
+					goto l60
 				}
 				{
-					position61, tokenIndex61 := position, tokenIndex
+					position62, tokenIndex62 := position, tokenIndex
 					if !_rules[rulenotation]() {
-						goto l61
+						goto l62
 					}
-					goto l62
-				l61:
-					position, tokenIndex = position61, tokenIndex61
+					goto l63
+				l62:
+					position, tokenIndex = position62, tokenIndex62
 				}
-			l62:
+			l63:
 				if buffer[position] != 'i' {
-					goto l59
+					goto l60
 				}
 				position++
 				_rules[rulesp]()
-				add(ruleimaginary, position60)
+				add(ruleimaginary, position61)
 			}
-			memoize(8, position59, tokenIndex59, true)
+			memoize(8, position60, tokenIndex60, true)
 			return true
-		l59:
-			memoize(8, position59, tokenIndex59, false)
-			position, tokenIndex = position59, tokenIndex59
+		l60:
+			memoize(8, position60, tokenIndex60, false)
+			position, tokenIndex = position60, tokenIndex60
 			return false
 		},
 		/* 9 number <- <(decimal notation? sp)> */
@@ -909,30 +917,30 @@ func (p *Calculator[U]) Init(options ...func(*Calculator[U]) error) error {
 			if memoized, ok := memoization[memoKey[U]{9, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position63, tokenIndex63 := position, tokenIndex
+			position64, tokenIndex64 := position, tokenIndex
 			{
-				position64 := position
+				position65 := position
 				if !_rules[ruledecimal]() {
-					goto l63
+					goto l64
 				}
 				{
-					position65, tokenIndex65 := position, tokenIndex
+					position66, tokenIndex66 := position, tokenIndex
 					if !_rules[rulenotation]() {
-						goto l65
+						goto l66
 					}
-					goto l66
-				l65:
-					position, tokenIndex = position65, tokenIndex65
+					goto l67
+				l66:
+					position, tokenIndex = position66, tokenIndex66
 				}
-			l66:
+			l67:
 				_rules[rulesp]()
-				add(rulenumber, position64)
+				add(rulenumber, position65)
 			}
-			memoize(9, position63, tokenIndex63, true)
+			memoize(9, position64, tokenIndex64, true)
 			return true
-		l63:
-			memoize(9, position63, tokenIndex63, false)
-			position, tokenIndex = position63, tokenIndex63
+		l64:
+			memoize(9, position64, tokenIndex64, false)
+			position, tokenIndex = position64, tokenIndex64
 			return false
 		},
 		/* 10 decimal <- <(('-' / '+')? [0-9]+ ('.' [0-9]*)?)> */
@@ -940,75 +948,75 @@ func (p *Calculator[U]) Init(options ...func(*Calculator[U]) error) error {
 			if memoized, ok := memoization[memoKey[U]{10, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position67, tokenIndex67 := position, tokenIndex
+			position68, tokenIndex68 := position, tokenIndex
 			{
-				position68 := position
+				position69 := position
 				{
-					position69, tokenIndex69 := position, tokenIndex
+					position70, tokenIndex70 := position, tokenIndex
 					{
-						position71, tokenIndex71 := position, tokenIndex
+						position72, tokenIndex72 := position, tokenIndex
 						if buffer[position] != '-' {
-							goto l72
+							goto l73
 						}
 						position++
-						goto l71
-					l72:
-						position, tokenIndex = position71, tokenIndex71
+						goto l72
+					l73:
+						position, tokenIndex = position72, tokenIndex72
 						if buffer[position] != '+' {
-							goto l69
+							goto l70
 						}
 						position++
 					}
-				l71:
-					goto l70
-				l69:
-					position, tokenIndex = position69, tokenIndex69
+				l72:
+					goto l71
+				l70:
+					position, tokenIndex = position70, tokenIndex70
 				}
-			l70:
+			l71:
 				if c := buffer[position]; c < '0' || c > '9' {
-					goto l67
+					goto l68
 				}
 				position++
-			l73:
-				{
-					position74, tokenIndex74 := position, tokenIndex
-					if c := buffer[position]; c < '0' || c > '9' {
-						goto l74
-					}
-					position++
-					goto l73
-				l74:
-					position, tokenIndex = position74, tokenIndex74
-				}
+			l74:
 				{
 					position75, tokenIndex75 := position, tokenIndex
-					if buffer[position] != '.' {
+					if c := buffer[position]; c < '0' || c > '9' {
 						goto l75
 					}
 					position++
-				l77:
-					{
-						position78, tokenIndex78 := position, tokenIndex
-						if c := buffer[position]; c < '0' || c > '9' {
-							goto l78
-						}
-						position++
-						goto l77
-					l78:
-						position, tokenIndex = position78, tokenIndex78
-					}
-					goto l76
+					goto l74
 				l75:
 					position, tokenIndex = position75, tokenIndex75
 				}
-			l76:
-				add(ruledecimal, position68)
+				{
+					position76, tokenIndex76 := position, tokenIndex
+					if buffer[position] != '.' {
+						goto l76
+					}
+					position++
+				l78:
+					{
+						position79, tokenIndex79 := position, tokenIndex
+						if c := buffer[position]; c < '0' || c > '9' {
+							goto l79
+						}
+						position++
+						goto l78
+					l79:
+						position, tokenIndex = position79, tokenIndex79
+					}
+					goto l77
+				l76:
+					position, tokenIndex = position76, tokenIndex76
+				}
+			l77:
+				add(ruledecimal, position69)
 			}
-			memoize(10, position67, tokenIndex67, true)
+			memoize(10, position68, tokenIndex68, true)
 			return true
-		l67:
-			memoize(10, position67, tokenIndex67, false)
-			position, tokenIndex = position67, tokenIndex67
+		l68:
+			memoize(10, position68, tokenIndex68, false)
+			position, tokenIndex = position68, tokenIndex68
 			return false
 		},
 		/* 11 notation <- <(('e' / 'E') decimal)> */
@@ -1016,34 +1024,34 @@ func (p *Calculator[U]) Init(options ...func(*Calculator[U]) error) error {
 			if memoized, ok := memoization[memoKey[U]{11, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position79, tokenIndex79 := position, tokenIndex
+			position80, tokenIndex80 := position, tokenIndex
 			{
-				position80 := position
+				position81 := position
 				{
-					position81, tokenIndex81 := position, tokenIndex
+					position82, tokenIndex82 := position, tokenIndex
 					if buffer[position] != 'e' {
-						goto l82
+						goto l83
 					}
 					position++
-					goto l81
-				l82:
-					position, tokenIndex = position81, tokenIndex81
+					goto l82
+				l83:
+					position, tokenIndex = position82, tokenIndex82
 					if buffer[position] != 'E' {
-						goto l79
+						goto l80
 					}
 					position++
 				}
-			l81:
+			l82:
 				if !_rules[ruledecimal]() {
-					goto l79
+					goto l80
 				}
-				add(rulenotation, position80)
+				add(rulenotation, position81)
 			}
-			memoize(11, position79, tokenIndex79, true)
+			memoize(11, position80, tokenIndex80, true)
 			return true
-		l79:
-			memoize(11, position79, tokenIndex79, false)
-			position, tokenIndex = position79, tokenIndex79
+		l80:
+			memoize(11, position80, tokenIndex80, false)
+			position, tokenIndex = position80, tokenIndex80
 			return false
 		},
 		/* 12 exp1 <- <('e' 'x' 'p' open e1 close)> */
@@ -1051,37 +1059,37 @@ func (p *Calculator[U]) Init(options ...func(*Calculator[U]) error) error {
 			if memoized, ok := memoization[memoKey[U]{12, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position83, tokenIndex83 := position, tokenIndex
+			position84, tokenIndex84 := position, tokenIndex
 			{
-				position84 := position
+				position85 := position
 				if buffer[position] != 'e' {
-					goto l83
+					goto l84
 				}
 				position++
 				if buffer[position] != 'x' {
-					goto l83
+					goto l84
 				}
 				position++
 				if buffer[position] != 'p' {
-					goto l83
+					goto l84
 				}
 				position++
 				if !_rules[ruleopen]() {
-					goto l83
+					goto l84
 				}
 				if !_rules[rulee1]() {
-					goto l83
+					goto l84
 				}
 				if !_rules[ruleclose]() {
-					goto l83
+					goto l84
 				}
-				add(ruleexp1, position84)
+				add(ruleexp1, position85)
 			}
-			memoize(12, position83, tokenIndex83, true)
+			memoize(12, position84, tokenIndex84, true)
 			return true
-		l83:
-			memoize(12, position83, tokenIndex83, false)
-			position, tokenIndex = position83, tokenIndex83
+		l84:
+			memoize(12, position84, tokenIndex84, false)
+			position, tokenIndex = position84, tokenIndex84
 			return false
 		},
 		/* 13 exp2 <- <('e' '^' value)> */
@@ -1089,27 +1097,27 @@ func (p *Calculator[U]) Init(options ...func(*Calculator[U]) error) error {
 			if memoized, ok := memoization[memoKey[U]{13, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position85, tokenIndex85 := position, tokenIndex
+			position86, tokenIndex86 := position, tokenIndex
 			{
-				position86 := position
+				position87 := position
 				if buffer[position] != 'e' {
-					goto l85
+					goto l86
 				}
 				position++
 				if buffer[position] != '^' {
-					goto l85
+					goto l86
 				}
 				position++
 				if !_rules[rulevalue]() {
-					goto l85
+					goto l86
 				}
-				add(ruleexp2, position86)
+				add(ruleexp2, position87)
 			}
-			memoize(13, position85, tokenIndex85, true)
+			memoize(13, position86, tokenIndex86, true)
 			return true
-		l85:
-			memoize(13, position85, tokenIndex85, false)
-			position, tokenIndex = position85, tokenIndex85
+		l86:
+			memoize(13, position86, tokenIndex86, false)
+			position, tokenIndex = position86, tokenIndex86
 			return false
 		},
 		/* 14 natural <- <('e' sp)> */
@@ -1117,21 +1125,21 @@ func (p *Calculator[U]) Init(options ...func(*Calculator[U]) error) error {
 			if memoized, ok := memoization[memoKey[U]{14, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position87, tokenIndex87 := position, tokenIndex
+			position88, tokenIndex88 := position, tokenIndex
 			{
-				position88 := position
+				position89 := position
 				if buffer[position] != 'e' {
-					goto l87
+					goto l88
 				}
 				position++
 				_rules[rulesp]()
-				add(rulenatural, position88)
+				add(rulenatural, position89)
 			}
-			memoize(14, position87, tokenIndex87, true)
+			memoize(14, position88, tokenIndex88, true)
 			return true
-		l87:
-			memoize(14, position87, tokenIndex87, false)
-			position, tokenIndex = position87, tokenIndex87
+		l88:
+			memoize(14, position88, tokenIndex88, false)
+			position, tokenIndex = position88, tokenIndex88
 			return false
 		},
 		/* 15 pi <- <('p' 'i' sp)> */
@@ -1139,25 +1147,25 @@ func (p *Calculator[U]) Init(options ...func(*Calculator[U]) error) error {
 			if memoized, ok := memoization[memoKey[U]{15, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position89, tokenIndex89 := position, tokenIndex
+			position90, tokenIndex90 := position, tokenIndex
 			{
-				position90 := position
+				position91 := position
 				if buffer[position] != 'p' {
-					goto l89
+					goto l90
 				}
 				position++
 				if buffer[position] != 'i' {
-					goto l89
+					goto l90
 				}
 				position++
 				_rules[rulesp]()
-				add(rulepi, position90)
+				add(rulepi, position91)
 			}
-			memoize(15, position89, tokenIndex89, true)
+			memoize(15, position90, tokenIndex90, true)
 			return true
-		l89:
-			memoize(15, position89, tokenIndex89, false)
-			position, tokenIndex = position89, tokenIndex89
+		l90:
+			memoize(15, position90, tokenIndex90, false)
+			position, tokenIndex = position90, tokenIndex90
 			return false
 		},
 		/* 16 prec <- <('p' 'r' 'e' 'c' open e1 close)> */
@@ -1165,41 +1173,41 @@ func (p *Calculator[U]) Init(options ...func(*Calculator[U]) error) error {
 			if memoized, ok := memoization[memoKey[U]{16, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position91, tokenIndex91 := position, tokenIndex
+			position92, tokenIndex92 := position, tokenIndex
 			{
-				position92 := position
+				position93 := position
 				if buffer[position] != 'p' {
-					goto l91
+					goto l92
 				}
 				position++
 				if buffer[position] != 'r' {
-					goto l91
+					goto l92
 				}
 				position++
 				if buffer[position] != 'e' {
-					goto l91
+					goto l92
 				}
 				position++
 				if buffer[position] != 'c' {
-					goto l91
+					goto l92
 				}
 				position++
 				if !_rules[ruleopen]() {
-					goto l91
+					goto l92
 				}
 				if !_rules[rulee1]() {
-					goto l91
+					goto l92
 				}
 				if !_rules[ruleclose]() {
-					goto l91
+					goto l92
 				}
-				add(ruleprec, position92)
+				add(ruleprec, position93)
 			}
-			memoize(16, position91, tokenIndex91, true)
+			memoize(16, position92, tokenIndex92, true)
 			return true
-		l91:
-			memoize(16, position91, tokenIndex91, false)
-			position, tokenIndex = position91, tokenIndex91
+		l92:
+			memoize(16, position92, tokenIndex92, false)
+			position, tokenIndex = position92, tokenIndex92
 			return false
 		},
 		/* 17 simplify <- <('s' 'i' 'm' 'p' 'l' 'i' 'f' 'y' open e1 close)> */
@@ -1207,57 +1215,57 @@ func (p *Calculator[U]) Init(options ...func(*Calculator[U]) error) error {
 			if memoized, ok := memoization[memoKey[U]{17, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position93, tokenIndex93 := position, tokenIndex
+			position94, tokenIndex94 := position, tokenIndex
 			{
-				position94 := position
+				position95 := position
 				if buffer[position] != 's' {
-					goto l93
+					goto l94
 				}
 				position++
 				if buffer[position] != 'i' {
-					goto l93
+					goto l94
 				}
 				position++
 				if buffer[position] != 'm' {
-					goto l93
+					goto l94
 				}
 				position++
 				if buffer[position] != 'p' {
-					goto l93
+					goto l94
 				}
 				position++
 				if buffer[position] != 'l' {
-					goto l93
+					goto l94
 				}
 				position++
 				if buffer[position] != 'i' {
-					goto l93
+					goto l94
 				}
 				position++
 				if buffer[position] != 'f' {
-					goto l93
+					goto l94
 				}
 				position++
 				if buffer[position] != 'y' {
-					goto l93
+					goto l94
 				}
 				position++
 				if !_rules[ruleopen]() {
-					goto l93
+					goto l94
 				}
 				if !_rules[rulee1]() {
-					goto l93
+					goto l94
 				}
 				if !_rules[ruleclose]() {
-					goto l93
+					goto l94
 				}
-				add(rulesimplify, position94)
+				add(rulesimplify, position95)
 			}
-			memoize(17, position93, tokenIndex93, true)
+			memoize(17, position94, tokenIndex94, true)
 			return true
-		l93:
-			memoize(17, position93, tokenIndex93, false)
-			position, tokenIndex = position93, tokenIndex93
+		l94:
+			memoize(17, position94, tokenIndex94, false)
+			position, tokenIndex = position94, tokenIndex94
 			return false
 		},
 		/* 18 derivative <- <('d' 'e' 'r' 'i' 'v' 'a' 't' 'i' 'v' 'e' open e1 close)> */
@@ -1265,518 +1273,580 @@ func (p *Calculator[U]) Init(options ...func(*Calculator[U]) error) error {
 			if memoized, ok := memoization[memoKey[U]{18, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position95, tokenIndex95 := position, tokenIndex
+			position96, tokenIndex96 := position, tokenIndex
 			{
-				position96 := position
+				position97 := position
 				if buffer[position] != 'd' {
-					goto l95
+					goto l96
 				}
 				position++
 				if buffer[position] != 'e' {
-					goto l95
+					goto l96
 				}
 				position++
 				if buffer[position] != 'r' {
-					goto l95
+					goto l96
 				}
 				position++
 				if buffer[position] != 'i' {
-					goto l95
+					goto l96
 				}
 				position++
 				if buffer[position] != 'v' {
-					goto l95
+					goto l96
 				}
 				position++
 				if buffer[position] != 'a' {
-					goto l95
+					goto l96
 				}
 				position++
 				if buffer[position] != 't' {
-					goto l95
+					goto l96
 				}
 				position++
 				if buffer[position] != 'i' {
-					goto l95
+					goto l96
 				}
 				position++
 				if buffer[position] != 'v' {
-					goto l95
+					goto l96
 				}
 				position++
 				if buffer[position] != 'e' {
-					goto l95
+					goto l96
 				}
 				position++
 				if !_rules[ruleopen]() {
-					goto l95
+					goto l96
 				}
 				if !_rules[rulee1]() {
-					goto l95
+					goto l96
 				}
 				if !_rules[ruleclose]() {
-					goto l95
+					goto l96
 				}
-				add(rulederivative, position96)
+				add(rulederivative, position97)
 			}
-			memoize(18, position95, tokenIndex95, true)
+			memoize(18, position96, tokenIndex96, true)
 			return true
-		l95:
-			memoize(18, position95, tokenIndex95, false)
-			position, tokenIndex = position95, tokenIndex95
+		l96:
+			memoize(18, position96, tokenIndex96, false)
+			position, tokenIndex = position96, tokenIndex96
 			return false
 		},
-		/* 19 log <- <('l' 'o' 'g' open e1 close)> */
+		/* 19 integrate <- <('i' 'n' 't' 'e' 'g' 'r' 'a' 't' 'e' open e1 close)> */
 		func() bool {
 			if memoized, ok := memoization[memoKey[U]{19, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position97, tokenIndex97 := position, tokenIndex
+			position98, tokenIndex98 := position, tokenIndex
 			{
-				position98 := position
-				if buffer[position] != 'l' {
-					goto l97
+				position99 := position
+				if buffer[position] != 'i' {
+					goto l98
 				}
 				position++
-				if buffer[position] != 'o' {
-					goto l97
+				if buffer[position] != 'n' {
+					goto l98
+				}
+				position++
+				if buffer[position] != 't' {
+					goto l98
+				}
+				position++
+				if buffer[position] != 'e' {
+					goto l98
 				}
 				position++
 				if buffer[position] != 'g' {
-					goto l97
+					goto l98
+				}
+				position++
+				if buffer[position] != 'r' {
+					goto l98
+				}
+				position++
+				if buffer[position] != 'a' {
+					goto l98
+				}
+				position++
+				if buffer[position] != 't' {
+					goto l98
+				}
+				position++
+				if buffer[position] != 'e' {
+					goto l98
 				}
 				position++
 				if !_rules[ruleopen]() {
-					goto l97
+					goto l98
 				}
 				if !_rules[rulee1]() {
-					goto l97
+					goto l98
 				}
 				if !_rules[ruleclose]() {
-					goto l97
+					goto l98
 				}
-				add(rulelog, position98)
+				add(ruleintegrate, position99)
 			}
-			memoize(19, position97, tokenIndex97, true)
+			memoize(19, position98, tokenIndex98, true)
 			return true
-		l97:
-			memoize(19, position97, tokenIndex97, false)
-			position, tokenIndex = position97, tokenIndex97
+		l98:
+			memoize(19, position98, tokenIndex98, false)
+			position, tokenIndex = position98, tokenIndex98
 			return false
 		},
-		/* 20 sqrt <- <('s' 'q' 'r' 't' open e1 close)> */
+		/* 20 log <- <('l' 'o' 'g' open e1 close)> */
 		func() bool {
 			if memoized, ok := memoization[memoKey[U]{20, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position99, tokenIndex99 := position, tokenIndex
+			position100, tokenIndex100 := position, tokenIndex
 			{
-				position100 := position
-				if buffer[position] != 's' {
-					goto l99
+				position101 := position
+				if buffer[position] != 'l' {
+					goto l100
 				}
 				position++
-				if buffer[position] != 'q' {
-					goto l99
+				if buffer[position] != 'o' {
+					goto l100
 				}
 				position++
-				if buffer[position] != 'r' {
-					goto l99
-				}
-				position++
-				if buffer[position] != 't' {
-					goto l99
+				if buffer[position] != 'g' {
+					goto l100
 				}
 				position++
 				if !_rules[ruleopen]() {
-					goto l99
+					goto l100
 				}
 				if !_rules[rulee1]() {
-					goto l99
+					goto l100
 				}
 				if !_rules[ruleclose]() {
-					goto l99
+					goto l100
 				}
-				add(rulesqrt, position100)
+				add(rulelog, position101)
 			}
-			memoize(20, position99, tokenIndex99, true)
+			memoize(20, position100, tokenIndex100, true)
 			return true
-		l99:
-			memoize(20, position99, tokenIndex99, false)
-			position, tokenIndex = position99, tokenIndex99
+		l100:
+			memoize(20, position100, tokenIndex100, false)
+			position, tokenIndex = position100, tokenIndex100
 			return false
 		},
-		/* 21 cos <- <('c' 'o' 's' open e1 close)> */
+		/* 21 sqrt <- <('s' 'q' 'r' 't' open e1 close)> */
 		func() bool {
 			if memoized, ok := memoization[memoKey[U]{21, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position101, tokenIndex101 := position, tokenIndex
+			position102, tokenIndex102 := position, tokenIndex
 			{
-				position102 := position
-				if buffer[position] != 'c' {
-					goto l101
-				}
-				position++
-				if buffer[position] != 'o' {
-					goto l101
-				}
-				position++
+				position103 := position
 				if buffer[position] != 's' {
-					goto l101
+					goto l102
+				}
+				position++
+				if buffer[position] != 'q' {
+					goto l102
+				}
+				position++
+				if buffer[position] != 'r' {
+					goto l102
+				}
+				position++
+				if buffer[position] != 't' {
+					goto l102
 				}
 				position++
 				if !_rules[ruleopen]() {
-					goto l101
+					goto l102
 				}
 				if !_rules[rulee1]() {
-					goto l101
+					goto l102
 				}
 				if !_rules[ruleclose]() {
-					goto l101
+					goto l102
 				}
-				add(rulecos, position102)
+				add(rulesqrt, position103)
 			}
-			memoize(21, position101, tokenIndex101, true)
+			memoize(21, position102, tokenIndex102, true)
 			return true
-		l101:
-			memoize(21, position101, tokenIndex101, false)
-			position, tokenIndex = position101, tokenIndex101
+		l102:
+			memoize(21, position102, tokenIndex102, false)
+			position, tokenIndex = position102, tokenIndex102
 			return false
 		},
-		/* 22 sin <- <('s' 'i' 'n' open e1 close)> */
+		/* 22 cos <- <('c' 'o' 's' open e1 close)> */
 		func() bool {
 			if memoized, ok := memoization[memoKey[U]{22, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position103, tokenIndex103 := position, tokenIndex
+			position104, tokenIndex104 := position, tokenIndex
 			{
-				position104 := position
+				position105 := position
+				if buffer[position] != 'c' {
+					goto l104
+				}
+				position++
+				if buffer[position] != 'o' {
+					goto l104
+				}
+				position++
 				if buffer[position] != 's' {
-					goto l103
-				}
-				position++
-				if buffer[position] != 'i' {
-					goto l103
-				}
-				position++
-				if buffer[position] != 'n' {
-					goto l103
+					goto l104
 				}
 				position++
 				if !_rules[ruleopen]() {
-					goto l103
+					goto l104
 				}
 				if !_rules[rulee1]() {
-					goto l103
+					goto l104
 				}
 				if !_rules[ruleclose]() {
-					goto l103
+					goto l104
 				}
-				add(rulesin, position104)
+				add(rulecos, position105)
 			}
-			memoize(22, position103, tokenIndex103, true)
+			memoize(22, position104, tokenIndex104, true)
 			return true
-		l103:
-			memoize(22, position103, tokenIndex103, false)
-			position, tokenIndex = position103, tokenIndex103
+		l104:
+			memoize(22, position104, tokenIndex104, false)
+			position, tokenIndex = position104, tokenIndex104
 			return false
 		},
-		/* 23 tan <- <('t' 'a' 'n' open e1 close)> */
+		/* 23 sin <- <('s' 'i' 'n' open e1 close)> */
 		func() bool {
 			if memoized, ok := memoization[memoKey[U]{23, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position105, tokenIndex105 := position, tokenIndex
+			position106, tokenIndex106 := position, tokenIndex
 			{
-				position106 := position
-				if buffer[position] != 't' {
-					goto l105
+				position107 := position
+				if buffer[position] != 's' {
+					goto l106
 				}
 				position++
-				if buffer[position] != 'a' {
-					goto l105
+				if buffer[position] != 'i' {
+					goto l106
 				}
 				position++
 				if buffer[position] != 'n' {
-					goto l105
+					goto l106
 				}
 				position++
 				if !_rules[ruleopen]() {
-					goto l105
+					goto l106
 				}
 				if !_rules[rulee1]() {
-					goto l105
+					goto l106
 				}
 				if !_rules[ruleclose]() {
-					goto l105
+					goto l106
 				}
-				add(ruletan, position106)
+				add(rulesin, position107)
 			}
-			memoize(23, position105, tokenIndex105, true)
+			memoize(23, position106, tokenIndex106, true)
 			return true
-		l105:
-			memoize(23, position105, tokenIndex105, false)
-			position, tokenIndex = position105, tokenIndex105
+		l106:
+			memoize(23, position106, tokenIndex106, false)
+			position, tokenIndex = position106, tokenIndex106
 			return false
 		},
-		/* 24 sub <- <(open e1 close)> */
+		/* 24 tan <- <('t' 'a' 'n' open e1 close)> */
 		func() bool {
 			if memoized, ok := memoization[memoKey[U]{24, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position107, tokenIndex107 := position, tokenIndex
+			position108, tokenIndex108 := position, tokenIndex
 			{
-				position108 := position
+				position109 := position
+				if buffer[position] != 't' {
+					goto l108
+				}
+				position++
+				if buffer[position] != 'a' {
+					goto l108
+				}
+				position++
+				if buffer[position] != 'n' {
+					goto l108
+				}
+				position++
 				if !_rules[ruleopen]() {
-					goto l107
+					goto l108
 				}
 				if !_rules[rulee1]() {
-					goto l107
+					goto l108
 				}
 				if !_rules[ruleclose]() {
-					goto l107
+					goto l108
 				}
-				add(rulesub, position108)
+				add(ruletan, position109)
 			}
-			memoize(24, position107, tokenIndex107, true)
+			memoize(24, position108, tokenIndex108, true)
 			return true
-		l107:
-			memoize(24, position107, tokenIndex107, false)
-			position, tokenIndex = position107, tokenIndex107
+		l108:
+			memoize(24, position108, tokenIndex108, false)
+			position, tokenIndex = position108, tokenIndex108
 			return false
 		},
-		/* 25 add <- <('+' sp)> */
+		/* 25 sub <- <(open e1 close)> */
 		func() bool {
 			if memoized, ok := memoization[memoKey[U]{25, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position109, tokenIndex109 := position, tokenIndex
+			position110, tokenIndex110 := position, tokenIndex
 			{
-				position110 := position
-				if buffer[position] != '+' {
-					goto l109
+				position111 := position
+				if !_rules[ruleopen]() {
+					goto l110
 				}
-				position++
-				_rules[rulesp]()
-				add(ruleadd, position110)
+				if !_rules[rulee1]() {
+					goto l110
+				}
+				if !_rules[ruleclose]() {
+					goto l110
+				}
+				add(rulesub, position111)
 			}
-			memoize(25, position109, tokenIndex109, true)
+			memoize(25, position110, tokenIndex110, true)
 			return true
-		l109:
-			memoize(25, position109, tokenIndex109, false)
-			position, tokenIndex = position109, tokenIndex109
+		l110:
+			memoize(25, position110, tokenIndex110, false)
+			position, tokenIndex = position110, tokenIndex110
 			return false
 		},
-		/* 26 minus <- <('-' sp)> */
+		/* 26 add <- <('+' sp)> */
 		func() bool {
 			if memoized, ok := memoization[memoKey[U]{26, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position111, tokenIndex111 := position, tokenIndex
+			position112, tokenIndex112 := position, tokenIndex
 			{
-				position112 := position
-				if buffer[position] != '-' {
-					goto l111
+				position113 := position
+				if buffer[position] != '+' {
+					goto l112
 				}
 				position++
 				_rules[rulesp]()
-				add(ruleminus, position112)
+				add(ruleadd, position113)
 			}
-			memoize(26, position111, tokenIndex111, true)
+			memoize(26, position112, tokenIndex112, true)
 			return true
-		l111:
-			memoize(26, position111, tokenIndex111, false)
-			position, tokenIndex = position111, tokenIndex111
+		l112:
+			memoize(26, position112, tokenIndex112, false)
+			position, tokenIndex = position112, tokenIndex112
 			return false
 		},
-		/* 27 multiply <- <('*' sp)> */
+		/* 27 minus <- <('-' sp)> */
 		func() bool {
 			if memoized, ok := memoization[memoKey[U]{27, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position113, tokenIndex113 := position, tokenIndex
+			position114, tokenIndex114 := position, tokenIndex
 			{
-				position114 := position
-				if buffer[position] != '*' {
-					goto l113
+				position115 := position
+				if buffer[position] != '-' {
+					goto l114
 				}
 				position++
 				_rules[rulesp]()
-				add(rulemultiply, position114)
+				add(ruleminus, position115)
 			}
-			memoize(27, position113, tokenIndex113, true)
+			memoize(27, position114, tokenIndex114, true)
 			return true
-		l113:
-			memoize(27, position113, tokenIndex113, false)
-			position, tokenIndex = position113, tokenIndex113
+		l114:
+			memoize(27, position114, tokenIndex114, false)
+			position, tokenIndex = position114, tokenIndex114
 			return false
 		},
-		/* 28 divide <- <('/' sp)> */
+		/* 28 multiply <- <('*' sp)> */
 		func() bool {
 			if memoized, ok := memoization[memoKey[U]{28, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position115, tokenIndex115 := position, tokenIndex
+			position116, tokenIndex116 := position, tokenIndex
 			{
-				position116 := position
-				if buffer[position] != '/' {
-					goto l115
+				position117 := position
+				if buffer[position] != '*' {
+					goto l116
 				}
 				position++
 				_rules[rulesp]()
-				add(ruledivide, position116)
+				add(rulemultiply, position117)
 			}
-			memoize(28, position115, tokenIndex115, true)
+			memoize(28, position116, tokenIndex116, true)
 			return true
-		l115:
-			memoize(28, position115, tokenIndex115, false)
-			position, tokenIndex = position115, tokenIndex115
+		l116:
+			memoize(28, position116, tokenIndex116, false)
+			position, tokenIndex = position116, tokenIndex116
 			return false
 		},
-		/* 29 modulus <- <('%' sp)> */
+		/* 29 divide <- <('/' sp)> */
 		func() bool {
 			if memoized, ok := memoization[memoKey[U]{29, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position117, tokenIndex117 := position, tokenIndex
+			position118, tokenIndex118 := position, tokenIndex
 			{
-				position118 := position
-				if buffer[position] != '%' {
-					goto l117
+				position119 := position
+				if buffer[position] != '/' {
+					goto l118
 				}
 				position++
 				_rules[rulesp]()
-				add(rulemodulus, position118)
+				add(ruledivide, position119)
 			}
-			memoize(29, position117, tokenIndex117, true)
+			memoize(29, position118, tokenIndex118, true)
 			return true
-		l117:
-			memoize(29, position117, tokenIndex117, false)
-			position, tokenIndex = position117, tokenIndex117
+		l118:
+			memoize(29, position118, tokenIndex118, false)
+			position, tokenIndex = position118, tokenIndex118
 			return false
 		},
-		/* 30 exponentiation <- <('^' sp)> */
+		/* 30 modulus <- <('%' sp)> */
 		func() bool {
 			if memoized, ok := memoization[memoKey[U]{30, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position119, tokenIndex119 := position, tokenIndex
+			position120, tokenIndex120 := position, tokenIndex
 			{
-				position120 := position
-				if buffer[position] != '^' {
-					goto l119
+				position121 := position
+				if buffer[position] != '%' {
+					goto l120
 				}
 				position++
 				_rules[rulesp]()
-				add(ruleexponentiation, position120)
+				add(rulemodulus, position121)
 			}
-			memoize(30, position119, tokenIndex119, true)
+			memoize(30, position120, tokenIndex120, true)
 			return true
-		l119:
-			memoize(30, position119, tokenIndex119, false)
-			position, tokenIndex = position119, tokenIndex119
+		l120:
+			memoize(30, position120, tokenIndex120, false)
+			position, tokenIndex = position120, tokenIndex120
 			return false
 		},
-		/* 31 open <- <('(' sp)> */
+		/* 31 exponentiation <- <('^' sp)> */
 		func() bool {
 			if memoized, ok := memoization[memoKey[U]{31, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position121, tokenIndex121 := position, tokenIndex
+			position122, tokenIndex122 := position, tokenIndex
 			{
-				position122 := position
-				if buffer[position] != '(' {
-					goto l121
+				position123 := position
+				if buffer[position] != '^' {
+					goto l122
 				}
 				position++
 				_rules[rulesp]()
-				add(ruleopen, position122)
+				add(ruleexponentiation, position123)
 			}
-			memoize(31, position121, tokenIndex121, true)
+			memoize(31, position122, tokenIndex122, true)
 			return true
-		l121:
-			memoize(31, position121, tokenIndex121, false)
-			position, tokenIndex = position121, tokenIndex121
+		l122:
+			memoize(31, position122, tokenIndex122, false)
+			position, tokenIndex = position122, tokenIndex122
 			return false
 		},
-		/* 32 close <- <(')' sp)> */
+		/* 32 open <- <('(' sp)> */
 		func() bool {
 			if memoized, ok := memoization[memoKey[U]{32, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position123, tokenIndex123 := position, tokenIndex
+			position124, tokenIndex124 := position, tokenIndex
 			{
-				position124 := position
-				if buffer[position] != ')' {
-					goto l123
+				position125 := position
+				if buffer[position] != '(' {
+					goto l124
 				}
 				position++
 				_rules[rulesp]()
-				add(ruleclose, position124)
+				add(ruleopen, position125)
 			}
-			memoize(32, position123, tokenIndex123, true)
+			memoize(32, position124, tokenIndex124, true)
 			return true
-		l123:
-			memoize(32, position123, tokenIndex123, false)
-			position, tokenIndex = position123, tokenIndex123
+		l124:
+			memoize(32, position124, tokenIndex124, false)
+			position, tokenIndex = position124, tokenIndex124
 			return false
 		},
-		/* 33 sp <- <(' ' / '\t')*> */
+		/* 33 close <- <(')' sp)> */
 		func() bool {
 			if memoized, ok := memoization[memoKey[U]{33, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position125, tokenIndex125 := position, tokenIndex
+			position126, tokenIndex126 := position, tokenIndex
 			{
-				position126 := position
-			l127:
-				{
-					position128, tokenIndex128 := position, tokenIndex
-					{
-						position129, tokenIndex129 := position, tokenIndex
-						if buffer[position] != ' ' {
-							goto l130
-						}
-						position++
-						goto l129
-					l130:
-						position, tokenIndex = position129, tokenIndex129
-						if buffer[position] != '\t' {
-							goto l128
-						}
-						position++
-					}
-				l129:
-					goto l127
-				l128:
-					position, tokenIndex = position128, tokenIndex128
+				position127 := position
+				if buffer[position] != ')' {
+					goto l126
 				}
-				add(rulesp, position126)
+				position++
+				_rules[rulesp]()
+				add(ruleclose, position127)
 			}
-			memoize(33, position125, tokenIndex125, true)
+			memoize(33, position126, tokenIndex126, true)
 			return true
+		l126:
+			memoize(33, position126, tokenIndex126, false)
+			position, tokenIndex = position126, tokenIndex126
+			return false
 		},
-		/* 34 row <- <(';' sp)> */
+		/* 34 sp <- <(' ' / '\t')*> */
 		func() bool {
 			if memoized, ok := memoization[memoKey[U]{34, position}]; ok {
 				return memoizedResult(memoized)
 			}
-			position131, tokenIndex131 := position, tokenIndex
+			position128, tokenIndex128 := position, tokenIndex
 			{
-				position132 := position
+				position129 := position
+			l130:
+				{
+					position131, tokenIndex131 := position, tokenIndex
+					{
+						position132, tokenIndex132 := position, tokenIndex
+						if buffer[position] != ' ' {
+							goto l133
+						}
+						position++
+						goto l132
+					l133:
+						position, tokenIndex = position132, tokenIndex132
+						if buffer[position] != '\t' {
+							goto l131
+						}
+						position++
+					}
+				l132:
+					goto l130
+				l131:
+					position, tokenIndex = position131, tokenIndex131
+				}
+				add(rulesp, position129)
+			}
+			memoize(34, position128, tokenIndex128, true)
+			return true
+		},
+		/* 35 row <- <(';' sp)> */
+		func() bool {
+			if memoized, ok := memoization[memoKey[U]{35, position}]; ok {
+				return memoizedResult(memoized)
+			}
+			position134, tokenIndex134 := position, tokenIndex
+			{
+				position135 := position
 				if buffer[position] != ';' {
-					goto l131
+					goto l134
 				}
 				position++
 				_rules[rulesp]()
-				add(rulerow, position132)
+				add(rulerow, position135)
 			}
-			memoize(34, position131, tokenIndex131, true)
+			memoize(35, position134, tokenIndex134, true)
 			return true
-		l131:
-			memoize(34, position131, tokenIndex131, false)
-			position, tokenIndex = position131, tokenIndex131
+		l134:
+			memoize(35, position134, tokenIndex134, false)
+			position, tokenIndex = position134, tokenIndex134
 			return false
 		},
 	}

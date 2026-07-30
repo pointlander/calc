@@ -204,6 +204,18 @@ func (c *Calculator[T]) Convert(n *node[T]) Value {
 					}
 					node = node.next
 				}
+			case ruleintegrate:
+				node := node.up
+				for node != nil {
+					if node.pegRule == rulee1 {
+						a = &Node{
+							Operation: OperationIntegrate,
+							Left:      convert(node),
+						}
+						return a
+					}
+					node = node.next
+				}
 			case rulelog:
 				node := node.up
 				for node != nil {
