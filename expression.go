@@ -37,12 +37,20 @@ const (
 	OperationImaginary
 	// OperationNumber is a real number
 	OperationNumber
+	// OperationMatrix is a matrix
+	OperationMatrix
 	// OperationNaturalExponentiation raises the natural number to a power
 	OperationNaturalExponentiation
 	// OperationNatural is the constant e
 	OperationNatural
 	// OperationPI is the constant pi
 	OperationPI
+	// OperationSetPrec sets the precision
+	OperationSetPrec
+	// OperationSimplify simplify the expression
+	OperationSimplify
+	// OperationDerivative compute the symbolic derivative
+	OperationDerivative
 	// OperationNaturalLogarithm os the natural logarithm
 	OperationNaturalLogarithm
 	// OperationSquareRoot computes the square root of a number
@@ -61,6 +69,7 @@ const (
 type Node struct {
 	Operation   Operation
 	Value       string
+	Matrix      *complex.Matrix
 	Left, Right *Node
 }
 
@@ -139,7 +148,8 @@ func (n *Node) String() string {
 }
 
 // Eval evaluates an expression
-func (n *Node) Eval() *complex.Matrix {
+func (n *Node) Eval() (*Node, *complex.Matrix) {
+	var expression *Node
 	var process func(n *Node) *complex.Matrix
 	process = func(n *Node) *complex.Matrix {
 		if n == nil {
@@ -188,6 +198,8 @@ func (n *Node) Eval() *complex.Matrix {
 			a := complex.NewMatrix(prec)
 			a.Neg(process(n.Left))
 			return &a
+		case OperationMatrix:
+			return n.Matrix
 		case OperationVariable:
 			ra := complex.NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
 			a := complex.NewMatrix(prec)
@@ -245,6 +257,21 @@ func (n *Node) Eval() *complex.Matrix {
 			c := complex.NewMatrix(prec)
 			c.Values = [][]complex.Rational{[]complex.Rational{*b}}
 			return &c
+		case OperationSetPrec:
+			a := process(n.Left)
+			prec = uint(a.Values[0][0].A.Num().Uint64())
+			return a
+		case OperationDerivative:
+			derivative := n.Left.Derivative()
+			if derivative != nil {
+				derivative = derivative.Simplify()
+			}
+			expression = derivative
+			return nil
+		case OperationSimplify:
+			derivative := n.Left.Simplify()
+			expression = derivative
+			return nil
 		case OperationNaturalLogarithm:
 			a := complex.NewMatrix(prec)
 			a.Log(process(n.Left))
@@ -269,7 +296,7 @@ func (n *Node) Eval() *complex.Matrix {
 		a := complex.NewMatrix(prec)
 		return &a
 	}
-	return process(n)
+	return expression, process(n)
 }
 
 // Derivative takes the derivative of the equation
