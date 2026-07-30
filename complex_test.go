@@ -157,7 +157,7 @@ func TestFloat_Div(t *testing.T) {
 	b := NewFloat(big.NewFloat(2), big.NewFloat(6))
 	a.Div(a, b)
 	t.Log(a.String())
-	if a.String() != "0.95 + -0.35i" {
+	if a.String() != "0.95 - 0.35i" {
 		t.Fatal("invalid result")
 	}
 }
@@ -212,7 +212,7 @@ func TestFloat_Cos(t *testing.T) {
 	a := NewFloat(big.NewFloat(1), big.NewFloat(1))
 	a.Cos(a)
 	t.Log(a.String())
-	if a.String() != "0.8337300251 + -0.9888977058i" {
+	if a.String() != "0.8337300251 - 0.9888977058i" {
 		t.Fatal("invalid result")
 	}
 
@@ -233,14 +233,14 @@ func TestFloat_Cos(t *testing.T) {
 	a = NewFloat(big.NewFloat(1), big.NewFloat(2))
 	a.Cos(a)
 	t.Log(a.String())
-	if a.String() != "2.032723007 + -3.051897799i" {
+	if a.String() != "2.032723007 - 3.051897799i" {
 		t.Fatal("invalid result")
 	}
 
 	a = NewFloat(big.NewFloat(2), big.NewFloat(1))
 	a.Cos(a)
 	t.Log(a.String())
-	if a.String() != "-0.6421481247 + -1.068607421i" {
+	if a.String() != "-0.6421481247 - 1.068607421i" {
 		t.Fatal("invalid result")
 	}
 }
@@ -256,7 +256,7 @@ func TestFloat_Sin(t *testing.T) {
 	a = NewFloat(big.NewFloat(0), big.NewFloat(1))
 	a.Sin(a)
 	t.Log(a.String())
-	if a.String() != "0 + 1.175201194i" {
+	if a.String() != "1.175201194i" {
 		t.Fatal("invalid result")
 	}
 
@@ -277,7 +277,7 @@ func TestFloat_Sin(t *testing.T) {
 	a = NewFloat(big.NewFloat(2), big.NewFloat(1))
 	a.Sin(a)
 	t.Log(a.String())
-	if a.String() != "1.403119251 + -0.489056259i" {
+	if a.String() != "1.403119251 - 0.489056259i" {
 		t.Fatal("invalid result")
 	}
 }
@@ -293,7 +293,7 @@ func TestFloat_Tan(t *testing.T) {
 	a = NewFloat(big.NewFloat(0), big.NewFloat(1))
 	a.Tan(a)
 	t.Log(a.String())
-	if a.String() != "0 + 0.761594156i" {
+	if a.String() != "0.761594156i" {
 		t.Fatal("invalid result")
 	}
 
@@ -337,7 +337,7 @@ func TestFloat_Log(t *testing.T) {
 	a = NewFloat(big.NewFloat(0), big.NewFloat(1))
 	a.Log(a)
 	t.Log(a.String())
-	if a.String() != "0 + 1.570796327i" {
+	if a.String() != "1.570796327i" {
 		t.Fatal("invalid result")
 	}
 
@@ -408,7 +408,7 @@ func TestRational_Div(t *testing.T) {
 	b := NewRational(big.NewRat(2, 1), big.NewRat(6, 1))
 	a.Div(a, b)
 	t.Log(a.String())
-	if a.String() != "19/20 + -7/20i" {
+	if a.String() != "19/20 - 7/20i" {
 		t.Fatal("invalid result")
 	}
 }

@@ -208,6 +208,23 @@ func (m *Matrix) Conj(a *Matrix) *Matrix {
 	})
 }
 
+// Re extracts the real part of each entry
+func (m *Matrix) Re(a *Matrix) *Matrix {
+	return m.apply(a, func(a *Rational) *Rational {
+		a.B.SetInt64(0)
+		return a
+	})
+}
+
+// Im extracts the imaginary part of each entry (as a real number)
+func (m *Matrix) Im(a *Matrix) *Matrix {
+	return m.apply(a, func(a *Rational) *Rational {
+		a.A.Set(a.B)
+		a.B.SetInt64(0)
+		return a
+	})
+}
+
 // Sqrt computes the square root of the matrix
 func (m *Matrix) Sqrt(a *Matrix) *Matrix {
 	return m.apply(a, func(a *Rational) *Rational {
@@ -343,7 +360,8 @@ func (m *Matrix) String() string {
 
 // Float is an imaginary number
 type Float struct {
-	A, B *big.Float
+	A *big.Float // Real part
+	B *big.Float // Imaginary part
 }
 
 // NewFloat creates a new imaginary number
@@ -398,16 +416,27 @@ func (f *Float) Conj(a *Float) *Float {
 	return f
 }
 
-// Div divides two imaginary numbers
+// Div divides two imaginary numbers: (a+bi)/(c+di) = ((ac+bd)+(bc-ad)i)/(c²+d²).
 func (f *Float) Div(a, b *Float) *Float {
-	c := NewFloat(big.NewFloat(0).SetPrec(f.A.Prec()), big.NewFloat(0).SetPrec(f.B.Prec()))
-	c.Conj(b)
-	x := NewFloat(a.A.Copy(a.A), a.B.Copy(a.B))
-	y := NewFloat(b.A.Copy(b.A), b.B.Copy(b.B))
-	x.Mul(x, c)
-	y.Mul(y, c)
-	f.A.Quo(x.A, y.A)
-	f.B.Quo(x.B, y.A)
+	prec := f.A.Prec()
+	if f.B.Prec() > prec {
+		prec = f.B.Prec()
+	}
+	aa := new(big.Float).Copy(a.A)
+	bb := new(big.Float).Copy(a.B)
+	cc := new(big.Float).Copy(b.A)
+	dd := new(big.Float).Copy(b.B)
+	// |b|² = c² + d²
+	denom := new(big.Float).SetPrec(prec)
+	denom.Add(new(big.Float).Mul(cc, cc), new(big.Float).Mul(dd, dd))
+	// real = (ac + bd) / |b|²
+	// imag = (bc - ad) / |b|²
+	ac := new(big.Float).Mul(aa, cc)
+	bd := new(big.Float).Mul(bb, dd)
+	bc := new(big.Float).Mul(bb, cc)
+	ad := new(big.Float).Mul(aa, dd)
+	f.A.Quo(new(big.Float).Add(ac, bd), denom)
+	f.B.Quo(new(big.Float).Sub(bc, ad), denom)
 	return f
 }
 
@@ -436,75 +465,86 @@ func (f *Float) Sqrt(a *Float) *Float {
 	return f
 }
 
-// Atan2 computes atan2 of x
+// Atan2 computes atan2(y, x) for the complex value x+yi (same as Arg).
 // https://en.wikipedia.org/wiki/Atan2
 func (f *Float) Atan2(x *Float) *Float {
-	a := x.A
-	b := x.B
-
-	if a.Cmp(big.NewFloat(0).SetPrec(a.Prec())) > 0 {
-		f.Arg(x)
-	} else if a.Cmp(big.NewFloat(0).SetPrec(a.Prec())) < 0 &&
-		b.Cmp(big.NewFloat(0).SetPrec(b.Prec())) >= 0 {
-		f.Arg(x)
-		f.A.Add(f.A, bigfloat.PI(a.Prec()))
-	} else if a.Cmp(big.NewFloat(0).SetPrec(a.Prec())) < 0 &&
-		b.Cmp(big.NewFloat(0).SetPrec(b.Prec())) < 0 {
-		f.Arg(x)
-		f.A.Sub(f.A, bigfloat.PI(f.A.Prec()))
-	} else {
-		f.Arg(x)
-	}
-
-	return f
+	return f.Arg(x)
 }
 
-// Arg computes arg(x + yi) = tan-1(y/x)
+// safeArctan computes arctan(t). bigfloat.Arctan does not converge for |t| ≥ 1,
+// so reduce via arctan(t) = sign(t)·π/2 − arctan(1/t) when |t| > 1.
+func safeArctan(t *big.Float) *big.Float {
+	prec := t.Prec()
+	if prec == 0 {
+		prec = 64
+	}
+	abs := new(big.Float).Abs(t)
+	one := big.NewFloat(1).SetPrec(prec)
+	cmp := abs.Cmp(one)
+	if cmp == 0 {
+		// ±π/4
+		q := new(big.Float).Quo(bigfloat.PI(prec), big.NewFloat(4).SetPrec(prec))
+		if t.Sign() < 0 {
+			q.Neg(q)
+		}
+		return q
+	}
+	if cmp > 0 {
+		// sign(t)*π/2 − arctan(1/t)
+		inv := new(big.Float).Quo(one, t)
+		at := bigfloat.Arctan(inv)
+		halfPi := new(big.Float).Quo(bigfloat.PI(prec), big.NewFloat(2).SetPrec(prec))
+		if t.Sign() < 0 {
+			halfPi.Neg(halfPi)
+		}
+		return new(big.Float).Sub(halfPi, at)
+	}
+	return bigfloat.Arctan(t)
+}
+
+// Arg computes arg(x + yi) using atan2(y, x) in (−π, π].
 // https://mathworld.wolfram.com/ComplexArgument.html
 func (f *Float) Arg(x *Float) *Float {
 	a := x.A
 	b := x.B
-	f.B = big.NewFloat(0).SetPrec(b.Prec())
-
-	if a.Cmp(big.NewFloat(0).SetPrec(a.Prec())) == 0 {
-		if b.Cmp(big.NewFloat(0).SetPrec(a.Prec())) < 0 {
-			f.A.Set(bigfloat.PI(a.Prec()))
-			f.A.Quo(f.A, big.NewFloat(2).SetPrec(a.Prec()))
-			f.A.Neg(f.A)
-		} else if b.Cmp(big.NewFloat(0).SetPrec(a.Prec())) == 0 {
-			f.A.SetInf(false)
-		} else {
-			f.A.Set(bigfloat.PI(a.Prec()))
-			f.A.Quo(f.A, big.NewFloat(2).SetPrec(a.Prec()))
-		}
-
-		return f
+	prec := a.Prec()
+	if b.Prec() > prec {
+		prec = b.Prec()
 	}
-
-	if a.Cmp(big.NewFloat(1).SetPrec(a.Prec())) == 0 &&
-		b.Cmp(big.NewFloat(0).SetPrec(b.Prec())) == 0 {
-		f.A.Set(big.NewFloat(0).SetPrec(a.Prec()))
-	} else if a.Cmp(big.NewFloat(1).SetPrec(a.Prec())) == 0 &&
-		b.Cmp(big.NewFloat(1).SetPrec(b.Prec())) == 0 {
-		f.A.Set(bigfloat.PI(a.Prec()))
-		f.A.Quo(f.A, big.NewFloat(4).SetPrec(a.Prec()))
-	} else if a.Cmp(big.NewFloat(0).SetPrec(a.Prec())) == 0 &&
-		b.Cmp(big.NewFloat(1).SetPrec(b.Prec())) == 0 {
-		f.A.Set(bigfloat.PI(b.Prec()))
-		f.A.Quo(f.A, big.NewFloat(2).SetPrec(b.Prec()))
-	} else if a.Cmp(big.NewFloat(-1).SetPrec(a.Prec())) == 0 &&
-		b.Cmp(big.NewFloat(0).SetPrec(b.Prec())) == 0 {
-		f.A.Set(bigfloat.PI(a.Prec()))
-	} else if a.Cmp(big.NewFloat(0).SetPrec(a.Prec())) == 0 &&
-		b.Cmp(big.NewFloat(-1).SetPrec(b.Prec())) == 0 {
-		f.A.Set(bigfloat.PI(b.Prec()))
-		f.A.Quo(f.A, big.NewFloat(2).SetPrec(b.Prec()))
-		f.A.Neg(f.A)
-	} else {
-		f.A.Quo(b, a)
-		f.A = bigfloat.Arctan(f.A)
+	if prec == 0 {
+		prec = 64
 	}
+	f.B = big.NewFloat(0).SetPrec(prec)
+	zero := big.NewFloat(0).SetPrec(prec)
+	pi := bigfloat.PI(prec)
+	halfPi := new(big.Float).Quo(new(big.Float).Copy(pi), big.NewFloat(2).SetPrec(prec))
 
+	cmpA := a.Cmp(zero)
+	cmpB := b.Cmp(zero)
+
+	switch {
+	case cmpA > 0:
+		// atan(y/x)
+		ratio := new(big.Float).SetPrec(prec).Quo(b, a)
+		f.A.Set(safeArctan(ratio))
+	case cmpA < 0 && cmpB >= 0:
+		// atan(y/x) + π
+		ratio := new(big.Float).SetPrec(prec).Quo(b, a)
+		f.A.Set(safeArctan(ratio))
+		f.A.Add(f.A, pi)
+	case cmpA < 0 && cmpB < 0:
+		// atan(y/x) - π
+		ratio := new(big.Float).SetPrec(prec).Quo(b, a)
+		f.A.Set(safeArctan(ratio))
+		f.A.Sub(f.A, pi)
+	case cmpA == 0 && cmpB > 0:
+		f.A.Set(halfPi)
+	case cmpA == 0 && cmpB < 0:
+		f.A.Neg(halfPi)
+	default:
+		// 0+0i — undefined; return +Inf by convention
+		f.A.SetInf(false)
+	}
 	return f
 }
 
@@ -583,22 +623,23 @@ func (f *Float) Tan(x *Float) *Float {
 	return f
 }
 
-// Log computes the natural log of x
+// Log computes the natural log of x: log|z| + i·arg(z)
 // https://en.wikipedia.org/wiki/Complex_logarithm
 func (f *Float) Log(x *Float) *Float {
 	a := x.A
-	aa := big.NewFloat(0).SetPrec(a.Prec())
-	aa.Mul(a, a)
 	b := x.B
-	bb := big.NewFloat(0).SetPrec(b.Prec())
-	bb.Mul(b, b)
-	real := big.NewFloat(0).SetPrec(a.Prec())
-	real.Add(aa, bb)
-	real = bigfloat.Log(bigfloat.Sqrt(real))
-	y := NewFloat(big.NewFloat(0).SetPrec(a.Prec()), big.NewFloat(0).SetPrec(b.Prec()))
-	y.Atan2(x)
-	f.A = real
-	f.B = y.A
+	prec := a.Prec()
+	if b.Prec() > prec {
+		prec = b.Prec()
+	}
+	aa := new(big.Float).Mul(a, a)
+	bb := new(big.Float).Mul(b, b)
+	mod := bigfloat.Sqrt(new(big.Float).Add(aa, bb))
+	real := bigfloat.Log(mod)
+	arg := NewFloat(big.NewFloat(0).SetPrec(prec), big.NewFloat(0).SetPrec(prec))
+	arg.Arg(x)
+	f.A.Set(real)
+	f.B.Set(arg.A)
 	return f
 }
 
@@ -666,17 +707,50 @@ func (f *Float) Rat(r *Rational) {
 	f.B.Rat(r.B)
 }
 
-// String returns a string of the imaginary number
+// isTiny reports whether x is negligible for display (underflow noise).
+func isTiny(x *big.Float) bool {
+	if x.Sign() == 0 {
+		return true
+	}
+	abs := new(big.Float).Abs(x)
+	// Treat magnitudes smaller than 1e-20 as zero for pretty-printing.
+	return abs.Cmp(big.NewFloat(1e-20)) < 0
+}
+
+// String returns a string of the complex number.
 func (f *Float) String() string {
-	if f.B.Cmp(big.NewFloat(0)) == 0 {
+	reTiny, imTiny := isTiny(f.A), isTiny(f.B)
+	if imTiny {
+		if reTiny {
+			return "0"
+		}
 		return f.A.String()
 	}
-	return f.A.String() + " + " + f.B.String() + "i"
+	if reTiny {
+		if f.B.Cmp(big.NewFloat(1)) == 0 {
+			return "i"
+		}
+		if f.B.Cmp(big.NewFloat(-1)) == 0 {
+			return "-i"
+		}
+		return f.B.String() + "i"
+	}
+	// Format as a ± bi
+	bAbs := new(big.Float).Abs(f.B)
+	sign := " + "
+	if f.B.Sign() < 0 {
+		sign = " - "
+	}
+	if bAbs.Cmp(big.NewFloat(1)) == 0 {
+		return f.A.String() + sign + "i"
+	}
+	return f.A.String() + sign + bAbs.String() + "i"
 }
 
 // Rational is an imaginary number
 type Rational struct {
-	A, B *big.Rat
+	A *big.Rat // Real part
+	B *big.Rat // Imaginary part
 }
 
 // NewRational creates a new imaginary number
@@ -722,16 +796,21 @@ func (r *Rational) Conj(a *Rational) *Rational {
 	return r
 }
 
-// Div divides two imaginary numbers
+// Div divides two imaginary numbers: (a+bi)/(c+di) = ((ac+bd)+(bc-ad)i)/(c²+d²).
+// Copies inputs so callers may pass overlapping or shared rationals safely.
 func (r *Rational) Div(a, b *Rational) *Rational {
-	c := NewRational(big.NewRat(0, 1), big.NewRat(0, 1))
-	c.Conj(b)
-	x := NewRational(a.A.Set(a.A), a.B.Set(a.B))
-	y := NewRational(b.A.Set(b.A), b.B.Set(b.B))
-	x.Mul(x, c)
-	y.Mul(y, c)
-	r.A.Quo(x.A, y.A)
-	r.B.Quo(x.B, y.A)
+	aa, bb := new(big.Rat).Set(a.A), new(big.Rat).Set(a.B)
+	cc, dd := new(big.Rat).Set(b.A), new(big.Rat).Set(b.B)
+	// |b|² = c² + d²
+	denom := new(big.Rat).Add(new(big.Rat).Mul(cc, cc), new(big.Rat).Mul(dd, dd))
+	// real = (ac + bd) / |b|²
+	// imag = (bc - ad) / |b|²
+	ac := new(big.Rat).Mul(aa, cc)
+	bd := new(big.Rat).Mul(bb, dd)
+	bc := new(big.Rat).Mul(bb, cc)
+	ad := new(big.Rat).Mul(aa, dd)
+	r.A.Quo(new(big.Rat).Add(ac, bd), denom)
+	r.B.Quo(new(big.Rat).Sub(bc, ad), denom)
 	return r
 }
 
@@ -742,7 +821,28 @@ func (r *Rational) Neg(a *Rational) *Rational {
 	return r
 }
 
-// String returns a string of the imaginary number
+// String returns a string of the complex rational.
 func (r *Rational) String() string {
-	return r.A.String() + " + " + r.B.String() + "i"
+	zero := big.NewRat(0, 1)
+	if r.B.Cmp(zero) == 0 {
+		return r.A.String()
+	}
+	if r.A.Cmp(zero) == 0 {
+		if r.B.Cmp(big.NewRat(1, 1)) == 0 {
+			return "i"
+		}
+		if r.B.Cmp(big.NewRat(-1, 1)) == 0 {
+			return "-i"
+		}
+		return r.B.String() + "i"
+	}
+	bAbs := new(big.Rat).Abs(r.B)
+	sign := " + "
+	if r.B.Sign() < 0 {
+		sign = " - "
+	}
+	if bAbs.Cmp(big.NewRat(1, 1)) == 0 {
+		return r.A.String() + sign + "i"
+	}
+	return r.A.String() + sign + bAbs.String() + "i"
 }

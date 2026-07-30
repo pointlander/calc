@@ -63,6 +63,14 @@ const (
 	OperationSine
 	// OperationTangent computes the tangent of a number
 	OperationTangent
+	// OperationAbs computes the absolute value / modulus
+	OperationAbs
+	// OperationConj computes the complex conjugate
+	OperationConj
+	// OperationRe extracts the real part
+	OperationRe
+	// OperationIm extracts the imaginary part
+	OperationIm
 	// OperationNotation is E notation operation
 	OperationNotation
 )
@@ -119,6 +127,12 @@ func (n *Node) String() string {
 		case OperationVariable:
 			return n.Value
 		case OperationImaginary:
+			if n.Value == "" || n.Value == "1" || n.Value == "+1" {
+				return "i"
+			}
+			if n.Value == "-1" {
+				return "-i"
+			}
 			return n.Value + "i"
 		case OperationNumber:
 			return n.Value
@@ -143,6 +157,14 @@ func (n *Node) String() string {
 			return "sin(" + process(n.Left) + ")"
 		case OperationTangent:
 			return "tan(" + process(n.Left) + ")"
+		case OperationAbs:
+			return "abs(" + process(n.Left) + ")"
+		case OperationConj:
+			return "conj(" + process(n.Left) + ")"
+		case OperationRe:
+			return "re(" + process(n.Left) + ")"
+		case OperationIm:
+			return "im(" + process(n.Left) + ")"
 		}
 		return ""
 	}
@@ -209,8 +231,12 @@ func (n *Node) Eval() (*Node, *Matrix) {
 			return &a
 		case OperationImaginary:
 			a := NewRational(big.NewRat(1, 1), big.NewRat(0, 1))
-			a.A.SetString(n.Value)
-
+			// Bare "i" has empty Value and means 1i.
+			if n.Value == "" {
+				a.A.SetInt64(1)
+			} else {
+				a.A.SetString(n.Value)
+			}
 			a.A, a.B = a.B, a.A
 			b := NewMatrix(prec)
 			b.Values = [][]Rational{[]Rational{*a}}
@@ -299,6 +325,22 @@ func (n *Node) Eval() (*Node, *Matrix) {
 		case OperationTangent:
 			a := NewMatrix(prec)
 			a.Tan(process(n.Left))
+			return &a
+		case OperationAbs:
+			a := NewMatrix(prec)
+			a.Abs(process(n.Left))
+			return &a
+		case OperationConj:
+			a := NewMatrix(prec)
+			a.Conj(process(n.Left))
+			return &a
+		case OperationRe:
+			a := NewMatrix(prec)
+			a.Re(process(n.Left))
+			return &a
+		case OperationIm:
+			a := NewMatrix(prec)
+			a.Im(process(n.Left))
 			return &a
 		}
 		a := NewMatrix(prec)
@@ -419,41 +461,21 @@ func (n *Node) Derivative() *Node {
 				Value:     "1",
 			}
 			return a
-		case OperationImaginary:
-			a := &Node{
-				Operation: OperationNumber,
-				Value:     "0",
+		case OperationImaginary, OperationNumber, OperationNotation,
+			OperationNatural, OperationPI:
+			// Complex/real constants differentiate to 0
+			return &Node{Operation: OperationNumber, Value: "0"}
+		case OperationAbs, OperationConj, OperationRe, OperationIm:
+			// Constant complex helpers → 0; otherwise leave as-is (not fully expanded)
+			if isConstantExpr(n.Left) {
+				return &Node{Operation: OperationNumber, Value: "0"}
 			}
-			return a
-		case OperationNumber:
-			a := &Node{
-				Operation: OperationNumber,
-				Value:     "0",
-			}
-			return a
-		case OperationNotation:
-			a := &Node{
-				Operation: OperationNumber,
-				Value:     "0",
-			}
-			return a
+			return &Node{Operation: n.Operation, Left: process(n.Left)}
 		case OperationNaturalExponentiation:
 			a := &Node{
 				Operation: OperationMultiply,
 				Left:      n,
 				Right:     process(n.Left),
-			}
-			return a
-		case OperationNatural:
-			a := &Node{
-				Operation: OperationNumber,
-				Value:     "0",
-			}
-			return a
-		case OperationPI:
-			a := &Node{
-				Operation: OperationNumber,
-				Value:     "0",
 			}
 			return a
 		case OperationNaturalLogarithm:
@@ -536,13 +558,21 @@ func (n *Node) Derivative() *Node {
 	return process(n)
 }
 
-// isConstantExpr reports whether the expression contains no variables.
+// isConstantExpr reports whether the expression contains no free variables.
+// Imaginary literals, re/im/conj/abs of constants, e, and pi count as constant.
 func isConstantExpr(n *Node) bool {
 	if n == nil {
 		return true
 	}
-	if n.Operation == OperationVariable {
+	switch n.Operation {
+	case OperationVariable:
 		return false
+	case OperationDerivative, OperationIntegrate, OperationSimplify, OperationSetPrec:
+		return false
+	case OperationAbs, OperationConj, OperationRe, OperationIm,
+		OperationNegate, OperationNaturalLogarithm, OperationSquareRoot,
+		OperationCosine, OperationSine, OperationTangent, OperationNaturalExponentiation:
+		return isConstantExpr(n.Left)
 	}
 	return isConstantExpr(n.Left) && isConstantExpr(n.Right)
 }
@@ -984,12 +1014,25 @@ func linearForm(n *Node) (a, b *Node, ok bool) {
 }
 
 // chainScale divides an antiderivative F(ax+b) by the linear coefficient a.
+// Supports real and complex constant a (e.g. ∫ e^(i x) dx = e^(i x)/i).
 func chainScale(F, a *Node) *Node {
-	if a == nil || (isNumeric(a.Operation) && a.Equals(1)) {
+	if a == nil {
+		return F
+	}
+	if isNumeric(a.Operation) && a.Equals(1) {
 		return F
 	}
 	if isNumeric(a.Operation) && a.Equals(-1) {
 		return nodeNegate(F)
+	}
+	// 1/i = -i, so F/i = -i·F
+	if isImaginaryUnit(a) {
+		negI := &Node{Operation: OperationNegate, Left: &Node{Operation: OperationImaginary, Value: "1"}}
+		return nodeMul(negI, F)
+	}
+	// F / (-i) = i·F
+	if a.Operation == OperationNegate && isImaginaryUnit(a.Left) {
+		return nodeMul(&Node{Operation: OperationImaginary, Value: "1"}, F)
 	}
 	return nodeDiv(F, a)
 }
@@ -2018,14 +2061,51 @@ func (n *Node) Integrate() *Node {
 	return process(n)
 }
 
+// numeric marks real (non-complex) literal kinds used for 0/1 folding.
+// OperationImaginary is intentionally excluded — "1i" must not be treated as 1.
 var numeric = map[Operation]bool{
-	OperationNumber:    true,
-	OperationImaginary: true,
-	OperationNotation:  true,
+	OperationNumber:   true,
+	OperationNotation: true,
 }
 
 func isNumeric(operation Operation) bool {
 	return numeric[operation]
+}
+
+// isImaginaryUnit reports whether n is the pure imaginary unit i (1i).
+func isImaginaryUnit(n *Node) bool {
+	if n == nil || n.Operation != OperationImaginary {
+		return false
+	}
+	return n.Value == "" || n.Value == "1" || n.Value == "+1"
+}
+
+// imagCoeff returns the integer coefficient of a pure imaginary literal (k·i).
+func imagCoeff(n *Node) (int64, bool) {
+	if n == nil || n.Operation != OperationImaginary {
+		return 0, false
+	}
+	if n.Value == "" || n.Value == "1" || n.Value == "+1" {
+		return 1, true
+	}
+	if n.Value == "-1" {
+		return -1, true
+	}
+	v := new(big.Int)
+	if _, ok := v.SetString(n.Value, 10); !ok || !v.IsInt64() {
+		return 0, false
+	}
+	return v.Int64(), true
+}
+
+func imagNode(k int64) *Node {
+	if k == 0 {
+		return nodeZero()
+	}
+	if k < 0 {
+		return &Node{Operation: OperationNegate, Left: imagNode(-k)}
+	}
+	return &Node{Operation: OperationImaginary, Value: fmt.Sprintf("%d", k)}
 }
 
 func intNode(v int64) *Node {
@@ -2322,10 +2402,16 @@ func (n *Node) simplifyOnce() *Node {
 			if left == nil || right == nil {
 				return n
 			}
-			// constant folding (integers and simple rationals)
+			// constant folding (integers and simple rationals) — reals only
 			if a, ad, ok1 := asRational(left); ok1 {
 				if b, bd, ok2 := asRational(right); ok2 {
 					return ratNode(a*bd+b*ad, ad*bd)
+				}
+			}
+			// (a i) + (b i) → (a+b) i
+			if li, ok1 := imagCoeff(left); ok1 {
+				if ri, ok2 := imagCoeff(right); ok2 {
+					return imagNode(li + ri)
 				}
 			}
 			if isNumeric(left.Operation) && left.Equals(0) {
@@ -2355,6 +2441,12 @@ func (n *Node) simplifyOnce() *Node {
 			if a, ad, ok1 := asRational(left); ok1 {
 				if b, bd, ok2 := asRational(right); ok2 {
 					return ratNode(a*bd-b*ad, ad*bd)
+				}
+			}
+			// (a i) - (b i) → (a-b) i
+			if li, ok1 := imagCoeff(left); ok1 {
+				if ri, ok2 := imagCoeff(right); ok2 {
+					return imagNode(li - ri)
 				}
 			}
 			if isNumeric(right.Operation) && right.Equals(0) {
@@ -2441,6 +2533,23 @@ func (n *Node) simplifyOnce() *Node {
 			if isNumeric(right.Operation) && right.Equals(1) {
 				return left
 			}
+			// i * i = -1; (a i)*(b i) = -a*b
+			if li, ok1 := imagCoeff(left); ok1 {
+				if ri, ok2 := imagCoeff(right); ok2 {
+					return intNode(-(li * ri))
+				}
+			}
+			// c * (k i) → (c*k) i
+			if x, ok1 := numericInt(left); ok1 {
+				if k, ok2 := imagCoeff(right); ok2 {
+					return imagNode(x * k)
+				}
+			}
+			if y, ok2 := numericInt(right); ok2 {
+				if k, ok1 := imagCoeff(left); ok1 {
+					return imagNode(y * k)
+				}
+			}
 			if x, ok1 := numericInt(left); ok1 {
 				if y, ok2 := numericInt(right); ok2 {
 					return intNode(x * y)
@@ -2453,7 +2562,6 @@ func (n *Node) simplifyOnce() *Node {
 					if _, ok := numericInt(right.Right); ok {
 						return process(mulConst(x, right))
 					}
-					// c * (a/b) → (c*a)/b (general b handled below as a*(b/c) pattern)
 				}
 				if x == -1 {
 					return process(&Node{Operation: OperationNegate, Left: right})
@@ -2564,6 +2672,24 @@ func (n *Node) simplifyOnce() *Node {
 			}
 			if y, ok := numericInt(right); ok && y == -1 {
 				return process(&Node{Operation: OperationNegate, Left: left})
+			}
+			// a/i = -i·a ; a/(k i) = -i·a/k
+			if k, ok := imagCoeff(right); ok && k != 0 {
+				// 1/(k i) = -i/k
+				negI := imagNode(-1)
+				if k == 1 || k == -1 {
+					if k == -1 {
+						negI = imagNode(1)
+					}
+					return process(nodeMul(negI, left))
+				}
+				return process(nodeDiv(nodeMul(negI, left), intNode(k)))
+			}
+			// (a i)/(b i) = a/b
+			if li, ok1 := imagCoeff(left); ok1 {
+				if ri, ok2 := imagCoeff(right); ok2 && ri != 0 {
+					return process(nodeDiv(intNode(li), intNode(ri)))
+				}
 			}
 			// a/a → 1
 			if nodesEqual(left, right) {
@@ -2724,6 +2850,44 @@ func (n *Node) simplifyOnce() *Node {
 			return n
 		case OperationNotation:
 			return n
+		case OperationRe:
+			left := process(n.Left)
+			// re(real) = real; re(k i) = 0
+			if isNumeric(left.Operation) || left.Operation == OperationNatural || left.Operation == OperationPI {
+				return left
+			}
+			if _, ok := imagCoeff(left); ok {
+				return nodeZero()
+			}
+			return &Node{Operation: OperationRe, Left: left}
+		case OperationIm:
+			left := process(n.Left)
+			// im(real) = 0; im(k i) = k
+			if isNumeric(left.Operation) || left.Operation == OperationNatural || left.Operation == OperationPI {
+				return nodeZero()
+			}
+			if k, ok := imagCoeff(left); ok {
+				return intNode(k)
+			}
+			return &Node{Operation: OperationIm, Left: left}
+		case OperationConj:
+			left := process(n.Left)
+			// conj(real) = real; conj(k i) = -k i
+			if isNumeric(left.Operation) || left.Operation == OperationNatural || left.Operation == OperationPI {
+				return left
+			}
+			if k, ok := imagCoeff(left); ok {
+				return imagNode(-k)
+			}
+			// conj(a+b) not fully expanded
+			return &Node{Operation: OperationConj, Left: left}
+		case OperationAbs:
+			left := process(n.Left)
+			// abs of non-negative real literal stays as abs(...) unless zero
+			if isNumeric(left.Operation) && left.Equals(0) {
+				return nodeZero()
+			}
+			return &Node{Operation: OperationAbs, Left: left}
 		case OperationNaturalExponentiation:
 			left := process(n.Left)
 			if isNumeric(left.Operation) && left.Equals(0) {

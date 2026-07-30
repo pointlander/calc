@@ -35,11 +35,17 @@ value <- matrix
        / cos
        / sin
        / tan
+       / abs
+       / conj
+       / re
+       / im
        / variable
        / sub
 variable <- [A-Za-z]+ sp
 matrix <- '[' sp (e1 / row)+ ']' sp
+# Bare "i" must not steal the start of identifiers like "integrate".
 imaginary <- decimal notation? 'i' sp
+           / 'i' ![A-Za-z0-9] sp
 number <- decimal notation? sp
 decimal <- [-+]? [0-9]+ ([.] [0-9]*)?
 notation <- "e" decimal
@@ -56,6 +62,10 @@ sqrt <- 'sqrt' open e1 close
 cos <- 'cos' open e1 close
 sin <- 'sin' open e1 close
 tan <- 'tan' open e1 close
+abs <- 'abs' open e1 close
+conj <- 'conj' open e1 close
+re <- 're' open e1 close
+im <- 'im' open e1 close
 sub <- open e1 close
 add <- '+' sp
 minus <- '-' sp

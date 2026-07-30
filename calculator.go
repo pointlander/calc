@@ -89,6 +89,7 @@ func (c *Calculator[T]) Convert(n *node[T]) Value {
 				node := node.up
 				a = &Node{
 					Operation: OperationImaginary,
+					Value:     "1", // bare "i" defaults to 1i
 				}
 				for node != nil {
 					switch node.pegRule {
@@ -269,6 +270,54 @@ func (c *Calculator[T]) Convert(n *node[T]) Value {
 					if node.pegRule == rulee1 {
 						a = &Node{
 							Operation: OperationTangent,
+							Left:      convert(node),
+						}
+						return a
+					}
+					node = node.next
+				}
+			case ruleabs:
+				node := node.up
+				for node != nil {
+					if node.pegRule == rulee1 {
+						a = &Node{
+							Operation: OperationAbs,
+							Left:      convert(node),
+						}
+						return a
+					}
+					node = node.next
+				}
+			case ruleconj:
+				node := node.up
+				for node != nil {
+					if node.pegRule == rulee1 {
+						a = &Node{
+							Operation: OperationConj,
+							Left:      convert(node),
+						}
+						return a
+					}
+					node = node.next
+				}
+			case rulere:
+				node := node.up
+				for node != nil {
+					if node.pegRule == rulee1 {
+						a = &Node{
+							Operation: OperationRe,
+							Left:      convert(node),
+						}
+						return a
+					}
+					node = node.next
+				}
+			case ruleim:
+				node := node.up
+				for node != nil {
+					if node.pegRule == rulee1 {
+						a = &Node{
+							Operation: OperationIm,
 							Left:      convert(node),
 						}
 						return a
